@@ -1,0 +1,64 @@
+A股每日量化推荐 - Windows Server E盘部署
+
+一、文件位置
+
+1. 把发布压缩包上传到服务器。
+2. 解压并整理为：
+
+   E:\stock-quant
+
+3. 确认以下文件存在：
+
+   E:\stock-quant\app.py
+   E:\stock-quant\scripts\install_windows_server.ps1
+   E:\stock-quant\database\mysql57_schema.sql
+
+不要把程序放到系统盘。Python 3.12 也建议安装到 E:\Python312。
+
+二、准备MySQL
+
+使用现有MySQL管理员账号执行：
+
+   E:\stock-quant\database\mysql57_schema.sql
+
+再参考以下文件创建最小权限应用账号：
+
+   E:\stock-quant\database\mysql57_app_user.sql.example
+
+数据库密码不要写进代码、聊天记录或发布压缩包。
+
+三、安装程序
+
+以管理员身份打开PowerShell：
+
+   cd E:\stock-quant
+   powershell -ExecutionPolicy Bypass -File scripts\install_windows_server.ps1 `
+     -WebPort 8501 `
+     -BindAddress 0.0.0.0 `
+     -DbHost 127.0.0.1 `
+     -DbPort 3306 `
+     -DbName stock_quant_saas `
+     -DbUser stock_quant_app `
+     -OpenFirewall
+
+脚本会要求现场输入MySQL应用账号密码，不会把密码写入项目文件。
+
+四、创建管理员
+
+   $env:ADMIN_MOBILE="管理员手机号"
+   $env:ADMIN_REAL_NAME="系统管理员"
+   $env:ADMIN_LOGIN_NAME="admin"
+   .\.venv\Scripts\python.exe scripts\create_admin.py
+
+管理员登录密码会在命令行中交互输入。
+
+五、检查服务
+
+   powershell -ExecutionPolicy Bypass -File scripts\server_status.ps1
+
+服务器本机测试：
+
+   http://127.0.0.1:8501
+
+外网测试前，需要在云平台安全组、Windows防火墙和路由器端口映射中放行网页端口。
+正式收费运营建议配置域名和HTTPS，不直接暴露Streamlit端口。

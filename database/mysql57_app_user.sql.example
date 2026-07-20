@@ -1,0 +1,12 @@
+-- Run as a MySQL administrator after replacing the password and host.
+-- Keep schema changes under an administrator/migration account; the web app
+-- only receives data read/write permissions.
+
+CREATE USER 'stock_quant_app'@'127.0.0.1'
+  IDENTIFIED BY 'REPLACE_WITH_A_LONG_RANDOM_PASSWORD';
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON `stock_quant_saas`.*
+  TO 'stock_quant_app'@'127.0.0.1';
+
+FLUSH PRIVILEGES;
