@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unittest
 from datetime import date
 from pathlib import Path
@@ -152,6 +153,27 @@ class QuantCoreTests(unittest.TestCase):
         findings = mysql_schema_findings(tables, set(), columns)
         self.assertTrue(any("password_hash" in item for item in findings))
         self.assertTrue(any(next(iter(MYSQL_REQUIRED_VIEWS)) in item for item in findings))
+
+    def test_mysql_health_contract_matches_schema_file(self) -> None:
+        schema = (Path(__file__).resolve().parents[1] / "database" / "mysql57_schema.sql").read_text(
+            encoding="utf-8"
+        )
+        for table, required_columns in MYSQL_REQUIRED_COLUMNS.items():
+            match = re.search(
+                rf"CREATE TABLE IF NOT EXISTS `{re.escape(table)}`\s*\((.*?)\) ENGINE=",
+                schema,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            self.assertIsNotNone(match, f"MySQL建表脚本缺少数据表：{table}")
+            table_sql = match.group(1)
+            declared_columns = set(
+                re.findall(r"^\s*`([^`]+)`\s+", table_sql, flags=re.MULTILINE)
+            )
+            self.assertFalse(
+                required_columns - declared_columns,
+                f"MySQL自检字段与建表脚本不一致：{table} 缺少 "
+                + "、".join(sorted(required_columns - declared_columns)),
+            )
 
     def test_manual_order_rejects_invalid_amount_before_database_access(self) -> None:
         with patch("stock_quant.auth._connect") as mocked_connect:
