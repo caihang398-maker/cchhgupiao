@@ -302,6 +302,25 @@ FUNDAMENTAL_FILTER_RULES = (
     ("dividend_stable", "历史分红"),
 )
 
+FACTOR_SOURCE_COLUMNS = {
+    "fund_flow_pass": ("net_inflow_3d", "net_inflow_5d", "net_inflow_10d"),
+    "valuation_normal": ("pe_est", "pb_est"),
+    "cashflow_good": ("operating_cash_flow", "operating_cash_flow_per_share"),
+    "dividend_stable": ("dividend_count", "dividend_year_ratio"),
+}
+
+
+def _factor_source_available(universe: pd.DataFrame, rule_column: str) -> bool:
+    source_columns = FACTOR_SOURCE_COLUMNS[rule_column]
+    present_columns = [column for column in source_columns if column in universe.columns]
+    if not present_columns:
+        # Boolean-only frames are used by older snapshots and unit tests.
+        return rule_column in universe.columns
+    if len(present_columns) != len(source_columns):
+        return False
+    minimum_rows = min(1_000, max(1, int(np.ceil(len(universe) * 0.2))))
+    return all(int(universe[column].notna().sum()) >= minimum_rows for column in source_columns)
+
 
 def _filter_fundamental_candidates(
     universe: pd.DataFrame,
@@ -319,14 +338,33 @@ def _filter_fundamental_candidates(
         "cashflow_good": require_cashflow,
         "dividend_stable": require_dividend,
     }
-    rules = [(column, label) for column, label in FUNDAMENTAL_FILTER_RULES if requested[column]]
+    requested_rules = [
+        (column, label) for column, label in FUNDAMENTAL_FILTER_RULES if requested[column]
+    ]
+    unavailable_rules = [
+        (column, label)
+        for column, label in requested_rules
+        if not _factor_source_available(universe, column)
+    ]
+    unavailable_columns = {column for column, _ in unavailable_rules}
+    rules = [item for item in requested_rules if item[0] not in unavailable_columns]
+    unavailable_labels = "、".join(label for _, label in unavailable_rules)
+    coverage_note = (
+        f"{unavailable_labels}数据覆盖不足，本轮未作为硬筛条件；推荐原因会明确标注。"
+        if unavailable_labels
+        else ""
+    )
     if universe.empty or not rules:
         result = universe.copy()
         result["filter_match_count"] = 0
         result["filter_match_total"] = len(rules)
+        result["filter_requested_total"] = len(requested_rules)
         result["filter_missing_labels"] = ""
-        result["filter_mode"] = "未启用基本面硬筛"
-        return result, ""
+        result["filter_unavailable_labels"] = unavailable_labels
+        result["filter_mode"] = (
+            "数据覆盖降级筛选" if unavailable_labels else "未启用基本面硬筛"
+        )
+        return result, coverage_note
 
     scored = universe.copy()
     matches: dict[str, pd.Series] = {}
@@ -339,6 +377,8 @@ def _filter_fundamental_candidates(
     match_frame = pd.DataFrame(matches, index=scored.index)
     scored["filter_match_count"] = match_frame.sum(axis=1).astype(int)
     scored["filter_match_total"] = len(rules)
+    scored["filter_requested_total"] = len(requested_rules)
+    scored["filter_unavailable_labels"] = unavailable_labels
     scored["filter_missing_labels"] = match_frame.apply(
         lambda row: "、".join(label for column, label in rules if not bool(row[column])),
         axis=1,
@@ -347,10 +387,10 @@ def _filter_fundamental_candidates(
     strict = scored[scored["filter_match_count"] == len(rules)].copy()
     if not strict.empty:
         strict["filter_mode"] = "严格匹配"
-        return strict, ""
+        return strict, coverage_note
     if not allow_near_match or len(rules) < 2:
         strict["filter_mode"] = "严格匹配"
-        return strict, ""
+        return strict, coverage_note
 
     thresholds = []
     for threshold in (len(rules) - 1, int(np.ceil(len(rules) / 2))):
@@ -361,14 +401,15 @@ def _filter_fundamental_candidates(
         if near.empty:
             continue
         near["filter_mode"] = f"观察级近似匹配（至少{threshold}/{len(rules)}项）"
-        note = (
+        near_note = (
             f"严格组合筛选无结果，已启用观察级近似匹配：候选至少满足{threshold}/{len(rules)}项；"
             "每只股票的未满足项会在推荐原因中标明。"
         )
+        note = " ".join(item for item in (coverage_note, near_note) if item)
         return near, note
 
     strict["filter_mode"] = "严格匹配"
-    return strict, ""
+    return strict, coverage_note
 
 
 def _enrich_records_with_keywords(
@@ -537,6 +578,9 @@ def _record(
             f"观察级近似匹配：满足{match_count}/{match_total}项"
             + (f"；未满足{missing}，需重点复核" if missing else "，需重点复核未达标条件")
         )
+    unavailable = str(factors.get("filter_unavailable_labels", "") or "").strip()
+    if unavailable:
+        reasons.append(f"数据覆盖提示：{unavailable}本轮未作为硬筛条件，需结合原始财报复核")
     factor_keywords = ("主力资金", "估值处于", "经营活动现金流", "历史分红")
     factor_reasons = [reason for reason in reasons if reason.startswith(factor_keywords)]
     reasons = factor_reasons + [reason for reason in reasons if reason not in factor_reasons]
@@ -606,6 +650,9 @@ def scan_recommendations(
 ) -> tuple[pd.DataFrame, MarketContext, list[str]]:
     errors: list[str] = []
     spot = fetch_spot(ignore_proxy=ignore_proxy)
+    spot_warning = str(spot.attrs.get("source_warning") or "").strip()
+    if spot_warning:
+        errors.append(f"行情数据提示：{spot_warning}")
     context = fetch_market_context(ignore_proxy=ignore_proxy)
     context.breadth = market_breadth(spot)
     errors.extend(context.errors)
@@ -681,6 +728,9 @@ def scan_recommendations(
 
     rows = [row.to_dict() for _, row in pool.iterrows()]
     done = 0
+    analyzed_success = 0
+    analyzed_failure = 0
+    signal_record_count = 0
     with ThreadPoolExecutor(max_workers=max(1, min(max_workers, 6))) as executor:
         futures = {executor.submit(analyze_row, row): row for row in rows}
         for future in as_completed(futures):
@@ -692,9 +742,12 @@ def scan_recommendations(
                 progress_callback(done, total, symbol.upper(), name)
             try:
                 _, _, records = future.result()
+                analyzed_success += 1
+                signal_record_count += len(records)
                 for record in records:
                     records_by_horizon[record["horizon"]].append(record)
             except Exception as exc:
+                analyzed_failure += 1
                 errors.append(f"{symbol.upper()} {name} 分析失败：{exc}")
 
     sorted_by_horizon = {
@@ -734,6 +787,11 @@ def scan_recommendations(
         horizon_order = {"short": 0, "mid": 1, "long": 2}
         frame["_order"] = frame["horizon"].map(horizon_order)
         frame = frame.sort_values(["_order", "score"], ascending=[True, False]).drop(columns=["_order"])
+    errors.append(
+        "扫描诊断："
+        f"基本面候选{total}只，K线分析成功{analyzed_success}只、失败{analyzed_failure}只，"
+        f"达到技术与仓位阈值{signal_record_count}条，最终推荐{len(frame)}只"
+    )
     return frame.reset_index(drop=True), context, errors
 
 

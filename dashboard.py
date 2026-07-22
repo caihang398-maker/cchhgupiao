@@ -3298,6 +3298,23 @@ def run_scan(
             require_dividend=require_dividend,
             allow_near_match=allow_near_match,
         )
+        if frame.empty:
+            diagnostic = next(
+                (item for item in reversed(errors) if str(item).startswith("扫描诊断：")),
+                "",
+            )
+            message = "本轮扫描完成，但没有股票同时满足技术趋势、风险仓位和当前筛选条件。"
+            if diagnostic:
+                message += diagnostic
+            raise DataSourceError(message)
+        result_dates = pd.to_datetime(frame.get("trade_date"), errors="coerce").dropna()
+        newest_result_date = result_dates.max().date() if not result_dates.empty else None
+        result_freshness = assess_recommendation_freshness(newest_result_date)
+        if result_freshness.level in {"missing", "invalid", "stale"}:
+            raise DataSourceError(
+                "本轮扫描取得的行情日期未达到可用新鲜度，结果没有保存。"
+                + result_freshness.message
+            )
         save_recommendations(frame.to_dict("records"))
         save_capital_hotspots(run_id, context.capital_hotspots)
         save_market_snapshot(
@@ -3434,8 +3451,13 @@ st.markdown(
 
 current_run, recommendations = latest_recommendation_set()
 if "latest_run_id" in st.session_state:
-    current_run = {**(current_run or {}), "id": st.session_state["latest_run_id"]}
-    recommendations = hydrate(load_recommendations(run_id=int(st.session_state["latest_run_id"])))
+    session_run_id = int(st.session_state["latest_run_id"])
+    session_recommendations = hydrate(load_recommendations(run_id=session_run_id))
+    if session_recommendations.empty:
+        st.session_state.pop("latest_run_id", None)
+    else:
+        current_run = {**(current_run or {}), "id": session_run_id}
+        recommendations = session_recommendations
 
 recommendation_summary(recommendations, current_run)
 freshness = assess_recommendation_freshness(
@@ -3507,7 +3529,7 @@ if refresh_clicked:
                 allow_near_match=allow_near_match,
             )
             recommendations = hydrate(recommendations)
-        st.success("今日推荐已刷新并保存。")
+        st.success(f"今日推荐已刷新并保存，共 {len(recommendations)} 只。")
         near_match_notes = [item for item in errors if str(item).startswith("严格组合筛选无结果")]
         if near_match_notes:
             st.warning(near_match_notes[-1])

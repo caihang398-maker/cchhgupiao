@@ -39,6 +39,8 @@ INDUSTRY_ALIASES = {
 }
 FUNDAMENTAL_CACHE_PATH = CACHE_DIR / "fundamental_latest.pkl"
 FUNDAMENTAL_CACHE_TTL_SECONDS = 20 * 60
+MIN_COMPLETE_REPORT_ROWS = 1_000
+MIN_FACTOR_COVERAGE_ROWS = 1_000
 
 
 @dataclass
@@ -137,16 +139,29 @@ def _fetch_latest_report(
     fetcher: Callable[..., pd.DataFrame],
     errors: list[str],
     label: str,
+    min_rows: int = MIN_COMPLETE_REPORT_ROWS,
 ) -> tuple[pd.DataFrame, str]:
     last_error = ""
+    partial_reports: list[tuple[str, int]] = []
     for report_date in _report_candidates():
         try:
             frame = fetcher(date=report_date)
-            if frame is not None and not frame.empty:
+            row_count = len(frame) if frame is not None else 0
+            if row_count >= min_rows:
+                if partial_reports:
+                    latest_date, latest_count = partial_reports[0]
+                    errors.append(
+                        f"{label}{latest_date}仅覆盖{latest_count}只，尚未完整披露；"
+                        f"已自动回退到{report_date}（{row_count}只）"
+                    )
                 return frame, report_date
+            if row_count:
+                partial_reports.append((report_date, row_count))
         except Exception as exc:
             last_error = str(exc)
-    errors.append(f"{label}获取失败：{last_error or '没有可用报告期'}")
+    partial_text = "、".join(f"{item_date}仅{count}只" for item_date, count in partial_reports[:3])
+    reason = last_error or partial_text or "没有可用报告期"
+    errors.append(f"{label}获取失败或覆盖不足：{reason}")
     return pd.DataFrame(), ""
 
 
@@ -417,42 +432,102 @@ def _add_factor_scores(frame: pd.DataFrame, report_date: str, min_inflow: float)
     return out
 
 
+def fundamental_coverage_findings(
+    universe: pd.DataFrame,
+    report_date: str,
+) -> list[str]:
+    """Return integrity findings for a supposedly complete market snapshot."""
+    if universe.empty:
+        return ["基本面快照为空"]
+
+    row_count = len(universe)
+    minimum_rows = min(
+        MIN_FACTOR_COVERAGE_ROWS,
+        max(1, int(np.ceil(row_count * 0.2))),
+    )
+    findings: list[str] = []
+    if row_count >= 1_000 and row_count < 5_000:
+        findings.append(f"股票覆盖仅{row_count}只")
+
+    coverage_groups = {
+        "3/5/10日主力资金": tuple(FLOW_PERIODS.values()),
+        "估值": ("pe_est", "pb_est"),
+        "经营现金流": ("operating_cash_flow", "operating_cash_flow_per_share"),
+        "历史分红": ("dividend_count", "dividend_year_ratio"),
+    }
+    for label, columns in coverage_groups.items():
+        counts = {
+            column: int(universe[column].notna().sum()) if column in universe.columns else 0
+            for column in columns
+        }
+        covered = min(counts.values()) if counts else 0
+        if covered < minimum_rows:
+            findings.append(f"{label}仅覆盖{covered}只，低于完整性阈值{minimum_rows}只")
+
+    latest_acceptable_report = f"{date.today().year - 1}1231"
+    if not report_date:
+        findings.append("缺少财报期")
+    elif str(report_date) < latest_acceptable_report:
+        findings.append(f"财报期{report_date}早于最低可接受期{latest_acceptable_report}")
+    return findings
+
+
+def _component_has_coverage(frame: pd.DataFrame, columns: tuple[str, ...]) -> bool:
+    if frame.empty:
+        return False
+    minimum_rows = min(
+        MIN_FACTOR_COVERAGE_ROWS,
+        max(1, int(np.ceil(len(frame) * 0.2))),
+    )
+    return all(
+        column in frame.columns and int(frame[column].notna().sum()) >= minimum_rows
+        for column in columns
+    )
+
+
+def _cached_component(
+    cached_universe: pd.DataFrame,
+    columns: tuple[str, ...],
+) -> pd.DataFrame:
+    required = ("code", *columns)
+    if cached_universe.empty or not all(column in cached_universe.columns for column in required):
+        return pd.DataFrame(columns=required)
+    return cached_universe[list(required)].drop_duplicates("code").copy()
+
+
 def fetch_fundamental_snapshot(
     spot: pd.DataFrame,
     min_inflow: float = 100_000_000,
     ignore_proxy: bool = True,
 ) -> FundamentalSnapshot:
+    cached_payload: dict[str, Any] = {}
     if FUNDAMENTAL_CACHE_PATH.exists():
-        age = time.time() - FUNDAMENTAL_CACHE_PATH.stat().st_mtime
-        if age <= FUNDAMENTAL_CACHE_TTL_SECONDS:
-            try:
-                cached = pd.read_pickle(FUNDAMENTAL_CACHE_PATH)
-                universe = cached["universe"].copy()
-                latest_acceptable_report = f"{date.today().year - 1}1231"
-                flow_complete = all(
-                    column in universe.columns and universe[column].notna().sum() >= 1000
-                    for column in FLOW_PERIODS.values()
-                )
-                if (
-                    len(universe) < 5000
-                    or not flow_complete
-                    or str(cached.get("report_date", "")) < latest_acceptable_report
-                ):
-                    raise ValueError("缓存完整性校验未通过")
+        try:
+            cached_payload = pd.read_pickle(FUNDAMENTAL_CACHE_PATH)
+            age = time.time() - FUNDAMENTAL_CACHE_PATH.stat().st_mtime
+            if age <= FUNDAMENTAL_CACHE_TTL_SECONDS:
+                universe = cached_payload["universe"].copy()
+                report_date = str(cached_payload.get("report_date", ""))
+                findings = fundamental_coverage_findings(universe, report_date)
+                if findings:
+                    raise ValueError("缓存完整性校验未通过：" + "；".join(findings))
                 universe = _refresh_cached_market_fields(universe, spot)
                 universe = _add_factor_scores(
                     universe,
-                    str(cached.get("report_date", "")),
+                    report_date,
                     min_inflow=min_inflow,
                 )
                 return FundamentalSnapshot(
                     universe=universe,
-                    hotspots=cached.get("hotspots", pd.DataFrame()).copy(),
-                    report_date=str(cached.get("report_date", "")),
+                    hotspots=cached_payload.get("hotspots", pd.DataFrame()).copy(),
+                    report_date=report_date,
                     errors=["资金面与基本面使用20分钟内的完整缓存快照"],
                 )
-            except Exception:
-                pass
+        except ValueError:
+            # Keep the readable snapshot as a per-factor last-good fallback.
+            pass
+        except Exception:
+            cached_payload = {}
 
     ak = get_akshare(ignore_proxy=ignore_proxy)
     errors: list[str] = []
@@ -460,6 +535,51 @@ def fetch_fundamental_snapshot(
     flows = fetch_fund_flows(ak, errors)
     financials, report_date = _financial_frame(ak, errors)
     dividends = _dividend_frame(ak, errors)
+
+    cached_universe = cached_payload.get("universe", pd.DataFrame()).copy()
+    flow_columns = tuple(FLOW_PERIODS.values())
+    if not _component_has_coverage(flows, flow_columns):
+        cached_flows = _cached_component(cached_universe, flow_columns)
+        if _component_has_coverage(cached_flows, flow_columns):
+            flows = cached_flows
+            errors.append("本轮主力资金接口覆盖不足，已沿用上次完整资金流快照")
+
+    financial_columns = (
+        "financial_name",
+        "eps",
+        "book_value_per_share",
+        "roe",
+        "operating_cash_flow_per_share",
+        "financial_industry",
+        "operating_cash_flow",
+        "operating_cash_flow_ratio",
+    )
+    financial_coverage_columns = (
+        "eps",
+        "book_value_per_share",
+        "operating_cash_flow_per_share",
+        "operating_cash_flow",
+    )
+    if not _component_has_coverage(financials, financial_coverage_columns):
+        cached_financials = _cached_component(cached_universe, financial_columns)
+        if _component_has_coverage(cached_financials, financial_coverage_columns):
+            financials = cached_financials
+            report_date = str(cached_payload.get("report_date", report_date))
+            errors.append("本轮财报接口覆盖不足，已沿用上次完整财报快照")
+
+    dividend_columns = (
+        "dividend_count",
+        "annual_dividend",
+        "average_dividend_yield",
+        "dividend_year_ratio",
+        "dividend_stable",
+    )
+    dividend_coverage_columns = ("dividend_count", "dividend_year_ratio")
+    if not _component_has_coverage(dividends, dividend_coverage_columns):
+        cached_dividends = _cached_component(cached_universe, dividend_columns)
+        if _component_has_coverage(cached_dividends, dividend_coverage_columns):
+            dividends = cached_dividends
+            errors.append("本轮分红接口覆盖不足，已沿用上次完整分红快照")
 
     universe = spot.copy()
     universe["code"] = universe["code"].map(normalize_code)
@@ -471,18 +591,19 @@ def fetch_fundamental_snapshot(
     universe = _add_factor_scores(universe, report_date, min_inflow=min_inflow)
 
     hotspots = fetch_capital_hotspots(ak, errors)
+    if hotspots.empty:
+        cached_hotspots = cached_payload.get("hotspots", pd.DataFrame()).copy()
+        if not cached_hotspots.empty:
+            hotspots = cached_hotspots
+            errors.append("本轮板块资金接口暂不可用，已沿用上次热点快照")
     snapshot = FundamentalSnapshot(
         universe=universe,
         hotspots=hotspots,
         report_date=report_date,
         errors=errors,
     )
-    latest_acceptable_report = f"{date.today().year - 1}1231"
-    flow_complete = all(
-        column in universe.columns and universe[column].notna().sum() >= 1000
-        for column in FLOW_PERIODS.values()
-    )
-    if len(universe) >= 5000 and flow_complete and report_date >= latest_acceptable_report:
+    coverage_findings = fundamental_coverage_findings(universe, report_date)
+    if not coverage_findings:
         try:
             FUNDAMENTAL_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
             pd.to_pickle(
@@ -495,4 +616,6 @@ def fetch_fundamental_snapshot(
             )
         except Exception:
             pass
+    else:
+        errors.append("本轮基本面快照未写入缓存：" + "；".join(coverage_findings))
     return snapshot

@@ -26,8 +26,11 @@ PROXY_ENV_KEYS = (
 ORIGINAL_PROXY_ENV = {key: os.environ.get(key) for key in PROXY_ENV_KEYS}
 ORIGINAL_REQUESTS_INIT: Any | None = None
 SPOT_CACHE_PATH = CACHE_DIR / "spot_latest.pkl"
+FUNDAMENTAL_CACHE_PATH = CACHE_DIR / "fundamental_latest.pkl"
 DAILY_CACHE_DIR = CACHE_DIR / "daily"
 MINUTE_CACHE_DIR = CACHE_DIR / "minute"
+MIN_SPOT_ROWS = 1_000
+MIN_SPOT_FIELD_COVERAGE = 1_000
 
 
 class DataSourceError(RuntimeError):
@@ -126,6 +129,8 @@ def infer_exchange(symbol: str) -> str:
         return raw[:2]
 
     code = plain_code(symbol)
+    if code.startswith("92"):
+        return "bj"
     if code.startswith(("6", "9")):
         return "sh"
     if code.startswith(("4", "8")):
@@ -164,71 +169,7 @@ def _normalize_spot_volume_lots(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd.DataFrame:
-    """Fetch A-share spot quotes with Sina retries and an Eastmoney fallback."""
-    ak = get_akshare(ignore_proxy=ignore_proxy)
-    errors: list[str] = []
-    raw = pd.DataFrame()
-    fallback_warning = ""
-    for attempt in range(3):
-        try:
-            raw = ak.stock_zh_a_spot()
-            if len(raw) >= 1000:
-                break
-            errors.append(f"新浪源第{attempt + 1}次返回不完整：{len(raw)}只")
-            raw = pd.DataFrame()
-        except Exception as exc:
-            errors.append(f"新浪源第{attempt + 1}次失败：{exc}")
-        time.sleep(1.5 * (attempt + 1))
-
-    if raw.empty:
-        try:
-            raw = ak.stock_zh_a_spot_em()
-            if len(raw) < 1000:
-                errors.append(f"东方财富备用源返回不完整：{len(raw)}只")
-                raw = pd.DataFrame()
-        except Exception as exc:
-            errors.append(f"东方财富备用源失败：{exc}")
-        if raw.empty:
-            try:
-                flow_spot = ak.stock_fund_flow_individual(symbol="即时")
-                if len(flow_spot) >= 1000:
-                    raw = flow_spot.rename(
-                        columns={
-                            "股票代码": "代码",
-                            "股票简称": "名称",
-                            "最新价": "最新价",
-                            "涨跌幅": "涨跌幅",
-                        }
-                    ).copy()
-                    raw["昨收"] = pd.to_numeric(raw["最新价"], errors="coerce") / (
-                        1 + pd.to_numeric(raw["涨跌幅"], errors="coerce").fillna(0) / 100
-                    )
-                    raw["今开"] = raw["昨收"]
-                    raw["最高"] = raw[["最新价", "昨收"]].max(axis=1)
-                    raw["最低"] = raw[["最新价", "昨收"]].min(axis=1)
-                    raw["成交额"] = 100_000_000.0
-                    raw["成交量"] = pd.NA
-                    fallback_warning = "实时行情源暂不可用，使用同花顺即时资金流行情完成扫描"
-                else:
-                    errors.append(f"同花顺即时行情返回不完整：{len(flow_spot)}只")
-            except Exception as exc:
-                errors.append(f"同花顺即时行情备用源失败：{exc}")
-        if raw.empty and allow_cache and SPOT_CACHE_PATH.exists():
-            try:
-                cached = pd.read_pickle(SPOT_CACHE_PATH)
-                if len(cached) >= 1000:
-                    cached = _normalize_spot_volume_lots(cached)
-                    cached.attrs["source_warning"] = "实时行情源暂不可用，已使用最近一次完整行情快照"
-                    return cached
-            except Exception as exc:
-                errors.append(f"本地行情快照读取失败：{exc}")
-        if raw.empty:
-            raise DataSourceError("无法获取实时行情：" + "；".join(errors))
-
-    if raw.empty:
-        raise DataSourceError("实时行情返回为空")
-
+def _normalize_spot_frame(raw: pd.DataFrame) -> pd.DataFrame:
     rename_map = {
         "代码": "symbol",
         "名称": "name",
@@ -244,10 +185,6 @@ def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd
         "成交量": "volume",
         "成交额": "turnover",
         "时间戳": "quote_time",
-        "今开": "open",
-        "最高": "high",
-        "最低": "low",
-        "昨收": "prev_close",
     }
     df = raw.rename(columns=rename_map).copy()
     expected = [
@@ -296,15 +233,313 @@ def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd
     df = _normalize_spot_volume_lots(df)
     df["turnover_yi"] = df["turnover"] / 100_000_000
     df["display"] = df["symbol"].str.upper() + " " + df["name"].fillna("")
-    if len(df) >= 1000:
+    return df.drop_duplicates("code", keep="last").reset_index(drop=True)
+
+
+def _infer_spot_quote_date(frame: pd.DataFrame, fallback: str | None = None) -> str:
+    """Resolve the actual quote date so cached prices are never stamped as today."""
+    if "quote_date" in frame.columns:
+        parsed = pd.to_datetime(frame["quote_date"], errors="coerce").dropna()
+        if not parsed.empty:
+            return parsed.max().date().isoformat()
+    if "quote_time" in frame.columns:
+        for value in frame["quote_time"].dropna().astype(str):
+            digits = re.sub(r"\D", "", value)
+            parsed = pd.NaT
+            if len(digits) >= 8 and digits[:4].startswith("20"):
+                parsed = pd.to_datetime(digits[:8], format="%Y%m%d", errors="coerce")
+            if pd.isna(parsed):
+                parsed = pd.to_datetime(value, errors="coerce")
+            if pd.notna(parsed):
+                return parsed.date().isoformat()
+    parsed_fallback = pd.to_datetime(fallback, errors="coerce")
+    if pd.notna(parsed_fallback):
+        return parsed_fallback.date().isoformat()
+    return date.today().isoformat()
+
+
+def _stamp_spot_quote_date(frame: pd.DataFrame, fallback: str | None = None) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    out = frame.copy()
+    quote_date = _infer_spot_quote_date(out, fallback=fallback)
+    out["quote_date"] = quote_date
+    out.attrs.update(frame.attrs)
+    out.attrs["quote_date"] = quote_date
+    return out
+
+
+def _spot_quality_findings(frame: pd.DataFrame, require_turnover: bool = True) -> list[str]:
+    """Detect row-rich but unusable spot snapshots before they reach screening."""
+    if frame.empty:
+        return ["行情为空"]
+    findings: list[str] = []
+    row_count = len(frame)
+    minimum = min(MIN_SPOT_FIELD_COVERAGE, max(1, int(row_count * 0.2)))
+    if row_count < MIN_SPOT_ROWS:
+        findings.append(f"仅返回{row_count}只股票")
+    for column, label in (("price", "有效现价"), ("prev_close", "有效昨收")):
+        covered = 0
+        if column in frame.columns:
+            values = pd.to_numeric(frame[column], errors="coerce")
+            covered = int((values > 0).sum())
+        if covered < minimum:
+            findings.append(f"{label}仅覆盖{covered}只")
+    if require_turnover:
+        covered = 0
+        if "turnover" in frame.columns:
+            turnover = pd.to_numeric(frame["turnover"], errors="coerce")
+            covered = int((turnover > 0).sum())
+        if covered < minimum:
+            findings.append(f"有效成交额仅覆盖{covered}只")
+    return findings
+
+
+def _load_spot_reference() -> pd.DataFrame:
+    """Load the most recent usable quote fields without trusting a bad cache."""
+    candidates: list[tuple[pd.DataFrame, str]] = []
+    if SPOT_CACHE_PATH.exists():
         try:
-            SPOT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            df.to_pickle(SPOT_CACHE_PATH)
+            candidates.append(
+                (
+                    pd.read_pickle(SPOT_CACHE_PATH),
+                    datetime.fromtimestamp(SPOT_CACHE_PATH.stat().st_mtime).date().isoformat(),
+                )
+            )
         except Exception:
             pass
+    if FUNDAMENTAL_CACHE_PATH.exists():
+        try:
+            payload = pd.read_pickle(FUNDAMENTAL_CACHE_PATH)
+            universe = payload.get("universe", pd.DataFrame()) if isinstance(payload, dict) else pd.DataFrame()
+            if isinstance(universe, pd.DataFrame):
+                fallback = str(payload.get("saved_at") or payload.get("trade_date") or "")
+                if not fallback:
+                    fallback = datetime.fromtimestamp(
+                        FUNDAMENTAL_CACHE_PATH.stat().st_mtime
+                    ).date().isoformat()
+                candidates.append((universe, fallback))
+        except Exception:
+            pass
+    for candidate, fallback in candidates:
+        if candidate.empty:
+            continue
+        frame = _stamp_spot_quote_date(candidate, fallback=fallback)
+        if "symbol" not in frame.columns and "code" in frame.columns:
+            frame["symbol"] = frame["code"].map(prefixed_symbol)
+        if "code" not in frame.columns and "symbol" in frame.columns:
+            frame["code"] = frame["symbol"].map(plain_code)
+        if not _spot_quality_findings(frame, require_turnover=True):
+            frame = _normalize_spot_volume_lots(frame)
+            return frame.drop_duplicates("code", keep="last").reset_index(drop=True)
+    return pd.DataFrame()
+
+
+def _merge_spot_liquidity(frame: pd.DataFrame, reference: pd.DataFrame) -> pd.DataFrame:
+    """Use the last complete session only for fields that are zero before the open."""
+    if frame.empty or reference.empty:
+        return frame
+    out = frame.copy()
+    ref = reference.copy()
+    out["code"] = out["code"].map(plain_code)
+    ref["code"] = ref["code"].map(plain_code)
+    ref = ref.drop_duplicates("code", keep="last").set_index("code")
+    for column in ("turnover", "volume"):
+        if column not in out.columns or column not in ref.columns:
+            continue
+        current = pd.to_numeric(out[column], errors="coerce")
+        previous = pd.to_numeric(out["code"].map(ref[column]), errors="coerce")
+        out[column] = current.where(current > 0, previous)
+    out["turnover_yi"] = pd.to_numeric(out["turnover"], errors="coerce") / 100_000_000
+    out.attrs.update(frame.attrs)
+    return out
+
+
+def _fetch_tencent_spot(universe: pd.DataFrame) -> pd.DataFrame:
+    """Fetch batch quotes from Tencent when the primary full-market feed is hollow."""
+    if universe.empty:
+        return pd.DataFrame()
+    source = universe.copy()
+    code_column = "代码" if "代码" in source.columns else "code"
+    name_column = "名称" if "名称" in source.columns else "name"
+    if code_column not in source.columns:
+        return pd.DataFrame()
+    source["_symbol"] = source[code_column].map(prefixed_symbol)
+    names = (
+        source[name_column]
+        if name_column in source.columns
+        else pd.Series("", index=source.index, dtype="object")
+    )
+    name_by_code = {
+        plain_code(code): str(name or "")
+        for code, name in zip(source[code_column], names, strict=False)
+    }
+    symbols = source["_symbol"].dropna().drop_duplicates().tolist()
+    rows: list[dict[str, Any]] = []
+    for offset in range(0, len(symbols), 160):
+        batch = symbols[offset : offset + 160]
+        response = requests.get(
+            "https://qt.gtimg.cn/q=" + ",".join(batch),
+            timeout=20,
+            headers={"User-Agent": "Mozilla/5.0", "Referer": "https://finance.qq.com/"},
+        )
+        response.raise_for_status()
+        response.encoding = "gbk"
+        for line in response.text.splitlines():
+            match = re.search(r'v_([^=]+)="(.*)";', line.strip())
+            if not match:
+                continue
+            source_symbol, payload = match.groups()
+            fields = payload.split("~")
+            if len(fields) < 38:
+                continue
+            code = plain_code(fields[2] or source_symbol)
+
+            def number(index: int) -> float | None:
+                try:
+                    return float(fields[index])
+                except (IndexError, TypeError, ValueError):
+                    return None
+
+            rows.append(
+                {
+                    "代码": source_symbol,
+                    "名称": fields[1] or name_by_code.get(code, ""),
+                    "最新价": number(3),
+                    "昨收": number(4),
+                    "今开": number(5),
+                    "成交量": number(36),
+                    "成交额": (number(37) or 0.0) * 10_000,
+                    "买入": number(9),
+                    "卖出": number(19),
+                    "时间戳": fields[30],
+                    "涨跌额": number(31),
+                    "涨跌幅": number(32),
+                    "最高": number(33),
+                    "最低": number(34),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd.DataFrame:
+    """Fetch A-share spot quotes and reject hollow full-market responses."""
+    ak = get_akshare(ignore_proxy=ignore_proxy)
+    errors: list[str] = []
+    frame = pd.DataFrame()
+    universe_source = pd.DataFrame()
+    fallback_warning = ""
+    for attempt in range(3):
+        try:
+            raw = ak.stock_zh_a_spot()
+            if not raw.empty and universe_source.empty:
+                universe_source = raw.copy()
+            normalized = _normalize_spot_frame(raw) if not raw.empty else pd.DataFrame()
+            findings = _spot_quality_findings(normalized, require_turnover=False)
+            if not findings:
+                frame = normalized
+                break
+            errors.append(f"新浪源第{attempt + 1}次质量不合格：{'、'.join(findings)}")
+            if len(raw) >= MIN_SPOT_ROWS:
+                break
+        except Exception as exc:
+            errors.append(f"新浪源第{attempt + 1}次失败：{exc}")
+        time.sleep(1.5 * (attempt + 1))
+
+    if frame.empty:
+        try:
+            raw = ak.stock_zh_a_spot_em()
+            if not raw.empty and universe_source.empty:
+                universe_source = raw.copy()
+            normalized = _normalize_spot_frame(raw) if not raw.empty else pd.DataFrame()
+            findings = _spot_quality_findings(normalized, require_turnover=False)
+            if findings:
+                errors.append(f"东方财富备用源质量不合格：{'、'.join(findings)}")
+            else:
+                frame = normalized
+        except Exception as exc:
+            errors.append(f"东方财富备用源失败：{exc}")
+
+    if frame.empty:
+        tencent_universe = universe_source
+        if tencent_universe.empty:
+            tencent_universe = _load_spot_reference()
+        try:
+            raw = _fetch_tencent_spot(tencent_universe)
+            normalized = _normalize_spot_frame(raw) if not raw.empty else pd.DataFrame()
+            findings = _spot_quality_findings(normalized, require_turnover=False)
+            if findings:
+                errors.append(f"腾讯备用源质量不合格：{'、'.join(findings)}")
+            else:
+                frame = normalized
+                fallback_warning = "主行情源数据无效，已自动切换腾讯批量行情"
+        except Exception as exc:
+            errors.append(f"腾讯备用源失败：{exc}")
+
+    if frame.empty:
+        try:
+            flow_spot = ak.stock_fund_flow_individual(symbol="即时")
+            if len(flow_spot) >= MIN_SPOT_ROWS:
+                raw = flow_spot.rename(
+                    columns={
+                        "股票代码": "代码",
+                        "股票简称": "名称",
+                        "最新价": "最新价",
+                        "涨跌幅": "涨跌幅",
+                    }
+                ).copy()
+                raw["昨收"] = pd.to_numeric(raw["最新价"], errors="coerce") / (
+                    1 + pd.to_numeric(raw["涨跌幅"], errors="coerce").fillna(0) / 100
+                )
+                raw["今开"] = raw["昨收"]
+                raw["最高"] = raw[["最新价", "昨收"]].max(axis=1)
+                raw["最低"] = raw[["最新价", "昨收"]].min(axis=1)
+                raw["成交额"] = 100_000_000.0
+                raw["成交量"] = pd.NA
+                normalized = _normalize_spot_frame(raw)
+                findings = _spot_quality_findings(normalized, require_turnover=False)
+                if findings:
+                    errors.append(f"同花顺即时行情质量不合格：{'、'.join(findings)}")
+                else:
+                    frame = normalized
+                    fallback_warning = "使用同花顺即时资金流行情完成扫描"
+            else:
+                errors.append(f"同花顺即时行情返回不完整：{len(flow_spot)}只")
+        except Exception as exc:
+            errors.append(f"同花顺即时行情备用源失败：{exc}")
+
+    reference = _load_spot_reference()
+    if not frame.empty:
+        before_turnover = int((pd.to_numeric(frame.get("turnover"), errors="coerce") > 0).sum())
+        frame = _merge_spot_liquidity(frame, reference)
+        after_turnover = int((pd.to_numeric(frame.get("turnover"), errors="coerce") > 0).sum())
+        if before_turnover < MIN_SPOT_FIELD_COVERAGE <= after_turnover:
+            fallback_warning = (
+                fallback_warning
+                + "；当前时段成交额尚未形成，流动性筛选沿用最近完整交易日"
+            ).strip("；")
+
+    findings = _spot_quality_findings(frame, require_turnover=True)
+    if findings:
+        errors.append("最终行情质量不合格：" + "、".join(findings))
+        frame = pd.DataFrame()
+
+    if frame.empty and allow_cache:
+        if not reference.empty:
+            reference.attrs["source_warning"] = "实时行情源暂不可用，已使用最近一次完整行情快照"
+            return reference
+    if frame.empty:
+        raise DataSourceError("无法获取有效实时行情：" + "；".join(errors[-6:]))
+
+    frame = _stamp_spot_quote_date(frame)
     if fallback_warning:
-        df.attrs["source_warning"] = fallback_warning
-    return df
+        frame.attrs["source_warning"] = fallback_warning
+    try:
+        SPOT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_pickle(SPOT_CACHE_PATH)
+    except Exception:
+        pass
+    return frame
 
 
 def fetch_spot(ignore_proxy: bool = False) -> pd.DataFrame:
@@ -321,15 +556,10 @@ def fetch_spot(ignore_proxy: bool = False) -> pd.DataFrame:
             return frame
         except Exception as exc:
             errors.append(f"{'直连' if bypass_proxy else '系统代理'}：{exc}")
-    if SPOT_CACHE_PATH.exists():
-        try:
-            cached = pd.read_pickle(SPOT_CACHE_PATH)
-            if len(cached) >= 1000:
-                cached = _normalize_spot_volume_lots(cached)
-                cached.attrs["source_warning"] = "实时行情源暂不可用，已使用最近一次完整行情快照"
-                return cached
-        except Exception as exc:
-            errors.append(f"本地行情快照：{exc}")
+    cached = _load_spot_reference()
+    if not cached.empty:
+        cached.attrs["source_warning"] = "实时行情源暂不可用，已使用最近一次完整行情快照"
+        return cached
     raise DataSourceError("无法获取实时行情：" + "；".join(errors[-2:]))
 
 
@@ -601,17 +831,22 @@ def prepare_spot_universe(
 
 
 def append_spot_bar(history: pd.DataFrame, spot_row: pd.Series | dict[str, Any] | None) -> pd.DataFrame:
-    """Append or update today's partial daily bar from a spot quote."""
+    """Append or update the quote-date bar without making cached prices look current."""
     if spot_row is None:
-        return history
-    if date.today().weekday() >= 5:
         return history
     row = pd.Series(spot_row)
     price = pd.to_numeric(row.get("price"), errors="coerce")
     if pd.isna(price) or float(price) <= 0:
         return history
 
-    today = pd.Timestamp(date.today())
+    quote_date = pd.to_datetime(row.get("quote_date"), errors="coerce")
+    if pd.isna(quote_date):
+        if date.today().weekday() >= 5:
+            return history
+        quote_date = pd.Timestamp(date.today())
+    quote_date = pd.Timestamp(quote_date).normalize()
+    if quote_date.date() > date.today():
+        return history
     open_price = pd.to_numeric(row.get("open"), errors="coerce")
     high_price = pd.to_numeric(row.get("high"), errors="coerce")
     low_price = pd.to_numeric(row.get("low"), errors="coerce")
@@ -619,7 +854,7 @@ def append_spot_bar(history: pd.DataFrame, spot_row: pd.Series | dict[str, Any] 
     turnover = pd.to_numeric(row.get("turnover"), errors="coerce")
 
     bar = {
-        "date": today,
+        "date": quote_date,
         "open": float(open_price) if pd.notna(open_price) and open_price > 0 else float(price),
         "close": float(price),
         "high": float(high_price) if pd.notna(high_price) and high_price > 0 else float(price),
@@ -630,7 +865,7 @@ def append_spot_bar(history: pd.DataFrame, spot_row: pd.Series | dict[str, Any] 
 
     out = history.copy()
     out["date"] = pd.to_datetime(out["date"], errors="coerce")
-    if not out.empty and pd.Timestamp(out["date"].iloc[-1]).normalize() == today:
+    if not out.empty and pd.Timestamp(out["date"].iloc[-1]).normalize() == quote_date:
         for key, value in bar.items():
             out.loc[out.index[-1], key] = value
     else:

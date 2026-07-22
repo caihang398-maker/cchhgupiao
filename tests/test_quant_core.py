@@ -30,12 +30,20 @@ from stock_quant.commercial import (
 )
 from stock_quant.data import (
     DataSourceError,
+    _merge_spot_liquidity,
     _normalize_spot_volume_lots,
+    _spot_quality_findings,
+    append_spot_bar,
     fetch_daily_history,
     fetch_spot,
+    infer_exchange,
     prepare_spot_universe,
 )
-from stock_quant.fundamentals import _refresh_cached_market_fields
+from stock_quant.fundamentals import (
+    _fetch_latest_report,
+    _refresh_cached_market_fields,
+    fundamental_coverage_findings,
+)
 from stock_quant.health import (
     MYSQL_REQUIRED_COLUMNS,
     MYSQL_REQUIRED_VIEWS,
@@ -54,7 +62,7 @@ from stock_quant.leaders import (
 from stock_quant.notify import mask_webhook_url, validate_webhook_url
 from stock_quant.position import analyze_position
 from stock_quant.presentation import format_date
-from stock_quant.recommender import _filter_fundamental_candidates
+from stock_quant.recommender import MarketContext, _candidate_pool, _filter_fundamental_candidates
 from stock_quant.product import (
     build_ai_research_table,
     build_daily_review_report,
@@ -221,6 +229,75 @@ class QuantCoreTests(unittest.TestCase):
         self.assertAlmostEqual(float(prepared.iloc[0]["change_pct"]), 5.0)
         self.assertTrue(np.isfinite(float(prepared.iloc[0]["pre_score"])))
 
+    def test_spot_quality_rejects_row_rich_hollow_snapshot(self) -> None:
+        row_count = 5_529
+        hollow = pd.DataFrame(
+            {
+                "price": np.zeros(row_count),
+                "prev_close": np.full(row_count, 10.0),
+                "turnover": np.zeros(row_count),
+            }
+        )
+
+        findings = _spot_quality_findings(hollow, require_turnover=True)
+
+        self.assertTrue(any("有效现价仅覆盖0只" in item for item in findings))
+        self.assertTrue(any("有效成交额仅覆盖0只" in item for item in findings))
+
+    def test_spot_liquidity_uses_last_complete_snapshot_before_open(self) -> None:
+        current = pd.DataFrame(
+            {
+                "code": ["600001", "600002"],
+                "price": [10.2, 8.1],
+                "prev_close": [10.0, 8.0],
+                "turnover": [0.0, 0.0],
+                "volume": [0.0, 0.0],
+            }
+        )
+        reference = pd.DataFrame(
+            {
+                "code": ["600001", "600002"],
+                "turnover": [250_000_000.0, 180_000_000.0],
+                "volume": [125_000.0, 90_000.0],
+            }
+        )
+
+        merged = _merge_spot_liquidity(current, reference)
+
+        self.assertEqual(merged["turnover"].tolist(), [250_000_000.0, 180_000_000.0])
+        self.assertEqual(merged["volume"].tolist(), [125_000.0, 90_000.0])
+        self.assertEqual(merged["turnover_yi"].tolist(), [2.5, 1.8])
+
+    def test_cached_spot_bar_keeps_its_actual_quote_date(self) -> None:
+        history = pd.DataFrame(
+            {
+                "date": pd.to_datetime(["2026-07-14"]),
+                "open": [10.0],
+                "close": [10.1],
+                "high": [10.2],
+                "low": [9.9],
+                "volume": [100_000.0],
+                "turnover": [101_000_000.0],
+            }
+        )
+        cached_quote = {
+            "quote_date": "2026-07-15",
+            "price": 10.5,
+            "open": 10.2,
+            "high": 10.6,
+            "low": 10.1,
+            "volume": 120_000.0,
+            "turnover": 126_000_000.0,
+        }
+
+        updated = append_spot_bar(history, cached_quote)
+
+        self.assertEqual(updated["date"].dt.strftime("%Y-%m-%d").tolist(), ["2026-07-14", "2026-07-15"])
+        self.assertAlmostEqual(float(updated.iloc[-1]["close"]), 10.5)
+
+    def test_new_beijing_exchange_codes_use_bj_prefix(self) -> None:
+        self.assertEqual(infer_exchange("920000"), "bj")
+
     def test_fundamental_filter_prefers_strict_matches(self) -> None:
         universe = pd.DataFrame(
             [
@@ -272,6 +349,123 @@ class QuantCoreTests(unittest.TestCase):
 
         strict_only, _ = _filter_fundamental_candidates(universe, allow_near_match=False)
         self.assertTrue(strict_only.empty)
+
+    def test_latest_report_skips_incomplete_early_disclosure_period(self) -> None:
+        errors: list[str] = []
+
+        def fetcher(*, date: str) -> pd.DataFrame:
+            return pd.DataFrame({"code": range(7 if date == "20260630" else 1_200)})
+
+        with patch(
+            "stock_quant.fundamentals._report_candidates",
+            return_value=["20260630", "20260331"],
+        ):
+            frame, report_date = _fetch_latest_report(fetcher, errors, "业绩报表")
+
+        self.assertEqual(report_date, "20260331")
+        self.assertEqual(len(frame), 1_200)
+        self.assertIn("20260630仅覆盖7只", errors[0])
+
+    def test_fundamental_coverage_rejects_partial_financial_snapshot(self) -> None:
+        row_count = 5_528
+        universe = pd.DataFrame(
+            {
+                "net_inflow_3d": np.ones(row_count),
+                "net_inflow_5d": np.ones(row_count),
+                "net_inflow_10d": np.ones(row_count),
+                "pe_est": [10.0] * 7 + [np.nan] * (row_count - 7),
+                "pb_est": [1.0] * 7 + [np.nan] * (row_count - 7),
+                "operating_cash_flow": [1.0] * 7 + [np.nan] * (row_count - 7),
+                "operating_cash_flow_per_share": [1.0] * 7 + [np.nan] * (row_count - 7),
+                "dividend_count": np.ones(row_count),
+                "dividend_year_ratio": np.ones(row_count),
+            }
+        )
+
+        findings = fundamental_coverage_findings(universe, "20260630")
+
+        self.assertTrue(any("估值仅覆盖7只" in item for item in findings))
+        self.assertTrue(any("经营现金流仅覆盖7只" in item for item in findings))
+
+    def test_fundamental_filter_explicitly_downgrades_unavailable_factors(self) -> None:
+        row_count = 10
+        universe = pd.DataFrame(
+            {
+                "code": [f"600{index:03d}" for index in range(row_count)],
+                "net_inflow_3d": np.ones(row_count),
+                "net_inflow_5d": np.ones(row_count),
+                "net_inflow_10d": np.ones(row_count),
+                "pe_est": [10.0] + [np.nan] * (row_count - 1),
+                "pb_est": [1.0] + [np.nan] * (row_count - 1),
+                "operating_cash_flow": [1.0] + [np.nan] * (row_count - 1),
+                "operating_cash_flow_per_share": [1.0] + [np.nan] * (row_count - 1),
+                "dividend_count": np.ones(row_count),
+                "dividend_year_ratio": np.ones(row_count),
+                "fund_flow_pass": True,
+                "valuation_normal": True,
+                "cashflow_good": True,
+                "dividend_stable": True,
+            }
+        )
+
+        filtered, note = _filter_fundamental_candidates(universe)
+
+        self.assertEqual(len(filtered), row_count)
+        self.assertEqual(int(filtered.iloc[0]["filter_match_total"]), 2)
+        self.assertIn("同行业估值", filtered.iloc[0]["filter_unavailable_labels"])
+        self.assertIn("经营现金流", note)
+
+    def test_candidate_pool_survives_unavailable_hotspot_sources(self) -> None:
+        universe = pd.DataFrame(
+            [
+                {
+                    "code": "600001",
+                    "symbol": "sh600001",
+                    "name": "测试股份",
+                    "price": 10.5,
+                    "prev_close": 10.0,
+                    "open": 10.1,
+                    "turnover": 250_000_000.0,
+                    "change_pct": 5.0,
+                    "net_inflow_3d": 150_000_000.0,
+                    "net_inflow_5d": 180_000_000.0,
+                    "net_inflow_10d": 220_000_000.0,
+                    "pe_est": 12.0,
+                    "pb_est": 1.4,
+                    "operating_cash_flow": 1_000_000_000.0,
+                    "operating_cash_flow_per_share": 1.2,
+                    "dividend_count": 5.0,
+                    "dividend_year_ratio": 0.8,
+                    "fund_flow_pass": True,
+                    "valuation_normal": True,
+                    "cashflow_good": True,
+                    "dividend_stable": True,
+                    "fundamental_score": 85.0,
+                }
+            ]
+        )
+        context = MarketContext(
+            boards=pd.DataFrame(),
+            hot_rank=pd.DataFrame(),
+            stock_themes={},
+            breadth={},
+            global_indices=pd.DataFrame(),
+            global_summary={},
+            capital_hotspots=pd.DataFrame(),
+            fundamental_universe=universe,
+            financial_report_date="20260331",
+            errors=["板块接口暂不可用"],
+        )
+
+        pool = _candidate_pool(
+            universe,
+            context,
+            min_turnover=50_000_000,
+            scan_size=80,
+        )
+
+        self.assertEqual(pool["code"].tolist(), ["600001"])
+        self.assertEqual(pool.iloc[0]["filter_mode"], "严格匹配")
 
     def test_spot_automatically_switches_proxy_mode(self) -> None:
         expected = pd.DataFrame({"code": ["600000"]})
