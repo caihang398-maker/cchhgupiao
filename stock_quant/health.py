@@ -282,3 +282,111 @@ def assess_recommendation_freshness(
         f"当前展示的是 {formatted} 推荐数据，已过去{weekdays_elapsed}个工作日；"
         "不得作为当日买卖依据，请先刷新并检查数据源。",
     )
+
+
+@dataclass(frozen=True)
+class MarketDataStatus:
+    level: str
+    quote_date: date | None
+    row_count: int
+    valid_price_count: int
+    source_label: str
+    is_cached: bool
+    message: str
+
+
+def assess_market_data_status(
+    quote_date: object,
+    row_count: int,
+    valid_price_count: int,
+    source_warning: str | None = None,
+    today: date | None = None,
+) -> MarketDataStatus:
+    """Summarize whether a quote snapshot is suitable for current-day decisions."""
+    rows = max(0, int(row_count or 0))
+    valid_prices = max(0, min(rows, int(valid_price_count or 0)))
+    warning = str(source_warning or "").strip()
+    cached_markers = (
+        "最近一次完整行情快照",
+        "最近一次成功缓存",
+        "显示最近一次",
+        "本地缓存",
+    )
+    is_cached = any(marker in warning for marker in cached_markers)
+
+    if is_cached:
+        source_label = "本地行情快照"
+    elif "腾讯" in warning:
+        source_label = "腾讯备用行情"
+    elif "同花顺" in warning:
+        source_label = "同花顺备用行情"
+    elif "东方财富" in warning:
+        source_label = "东方财富备用行情"
+    else:
+        source_label = "主行情源"
+
+    parsed_date = _parse_date(quote_date)
+    if rows == 0 or valid_prices == 0:
+        return MarketDataStatus(
+            "unavailable",
+            parsed_date,
+            rows,
+            valid_prices,
+            source_label,
+            is_cached,
+            "当前没有可用的全市场报价，请先更新行情。",
+        )
+
+    freshness = assess_recommendation_freshness(parsed_date, today=today)
+    if freshness.level in {"missing", "invalid", "aging", "stale"}:
+        date_text = parsed_date.strftime("%Y年%m月%d日") if parsed_date else "未知日期"
+        return MarketDataStatus(
+            "stale",
+            parsed_date,
+            rows,
+            valid_prices,
+            source_label,
+            is_cached,
+            f"行情报价日为 {date_text}，不适合直接作为当日交易判断。",
+        )
+
+    coverage = valid_prices / rows if rows else 0.0
+    if coverage < 0.8:
+        return MarketDataStatus(
+            "degraded",
+            parsed_date,
+            rows,
+            valid_prices,
+            source_label,
+            is_cached,
+            f"行情仅有 {valid_prices:,}/{rows:,} 只股票具备有效价格，请谨慎使用。",
+        )
+    if is_cached:
+        return MarketDataStatus(
+            "cached",
+            parsed_date,
+            rows,
+            valid_prices,
+            source_label,
+            True,
+            "当前使用最近一次成功行情快照，交易前建议重新更新。",
+        )
+    if warning:
+        return MarketDataStatus(
+            "degraded",
+            parsed_date,
+            rows,
+            valid_prices,
+            source_label,
+            False,
+            "行情已自动启用备用链路，主要报价可用，请留意数据源说明。",
+        )
+    return MarketDataStatus(
+        "fresh",
+        parsed_date,
+        rows,
+        valid_prices,
+        source_label,
+        False,
+        "行情日期与覆盖率检查通过。",
+    )

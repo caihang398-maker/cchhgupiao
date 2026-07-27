@@ -30,11 +30,12 @@ from stock_quant.data import (
     fetch_market_news,
     fetch_spot,
     global_risk_summary,
+    load_cached_spot_snapshot,
     market_breadth,
     plain_code,
     prefixed_symbol,
 )
-from stock_quant.health import assess_recommendation_freshness
+from stock_quant.health import assess_market_data_status, assess_recommendation_freshness
 from stock_quant.indicators import add_indicators
 from stock_quant.leaders import LeaderBundle, fetch_leader_bundle, leader_switches
 from stock_quant.logging_config import configure_application_logging
@@ -148,6 +149,43 @@ COMMON_VALUE_LABELS = {
 }
 
 
+DASHBOARD_WORKSPACES = {
+    "今日决策": ("短中长期推荐", "每日复盘"),
+    "选股研究": (
+        "条件选股",
+        "市场地图",
+        "行业题材",
+        "资金热点",
+        "主线雷达",
+        "情绪周期",
+        "龙头追踪",
+        "个股买卖点",
+    ),
+    "持仓风控": ("持仓中心", "预警中心", "模拟交易"),
+    "复盘管理": ("策略回测", "数据表", "推送", "商业体检"),
+}
+
+DASHBOARD_MODULE_HINTS = {
+    "短中长期推荐": "每天先看候选、买点、止损和策略类型，再决定是否进入自选观察。",
+    "每日复盘": "收盘后复核推荐表现、市场状态与次日关注重点。",
+    "条件选股": "按价格、策略、行业和风险条件缩小候选范围。",
+    "市场地图": "快速识别市场最强行业、题材和资金聚集方向。",
+    "行业题材": "查看本轮扫描使用的行业与题材强度。",
+    "资金热点": "观察每日、每周、每月的主力资金方向。",
+    "主线雷达": "跟踪板块从启动、加速到退潮的阶段变化。",
+    "情绪周期": "结合涨停梯队、炸板率和连板高度判断市场情绪。",
+    "龙头追踪": "比较板块龙一、龙二、龙三的走势与切换记录。",
+    "个股买卖点": "分析单只股票的K线、风险位和个人持仓回本方案。",
+    "持仓中心": "保存持仓并批量生成当日做T、止损和回本路径。",
+    "预警中心": "集中查看买点、止损、资金与板块变化提醒。",
+    "模拟交易": "先在模拟账户验证策略执行，再考虑真实交易。",
+    "策略回测": "用历史数据检查策略收益、回撤和交易稳定性。",
+    "数据表": "查看扫描记录、数据版本并导出推荐结果。",
+    "推送": "把当日推荐摘要发送到已配置的通知通道。",
+    "商业体检": "检查数据、会员、合规和运营功能的发布完整度。",
+}
+
+
 def friendly_data_source_error(exc: Exception, action: str) -> str:
     detail = str(exc)
     lowered = detail.lower()
@@ -216,6 +254,29 @@ st.markdown(
         overflow-wrap: anywhere;
     }
     .metric-card-wide .metric-value { white-space: nowrap; font-size: 1.05rem; }
+    .data-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        margin: 0.15rem 0 0.7rem 0;
+        border: 1px solid #d1d5db;
+        border-left-width: 4px;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #374151;
+        font-size: 0.88rem;
+        line-height: 1.45;
+    }
+    .data-status strong { color: #111827; }
+    .data-status--fresh { border-left-color: #16a34a; background: #f0fdf4; }
+    .data-status--degraded, .data-status--cached { border-left-color: #d97706; background: #fffbeb; }
+    .data-status--stale, .data-status--unavailable { border-left-color: #dc2626; background: #fef2f2; }
+    .workspace-hint {
+        color: #6b7280;
+        font-size: 0.88rem;
+        padding-top: 0.4rem;
+    }
     .pill {
         display: inline-block;
         padding: 4px 9px;
@@ -338,7 +399,7 @@ def load_history(symbol: str, years: int, ignore_proxy: bool) -> pd.DataFrame:
     return fetch_daily_history(symbol, start_date=start, adjust="qfq", ignore_proxy=ignore_proxy)
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=60, show_spinner=False)
 def load_spot_for_lookup(ignore_proxy: bool) -> pd.DataFrame:
     return fetch_spot(ignore_proxy=ignore_proxy)
 
@@ -361,7 +422,7 @@ def load_news_context(symbol: str, ignore_proxy: bool) -> tuple[pd.DataFrame, li
     return fetch_market_news(symbol, ignore_proxy=ignore_proxy, timeout=4.0)
 
 
-@st.cache_data(ttl=900, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_leader_bundle(
     board_type: str,
     board_name: str,
@@ -674,6 +735,43 @@ def market_summary(
         f"涨跌幅中位数 {float(breadth['median_change']):.2f}% · "
         f"涨幅≥5% {int(breadth['strong'])}只 · 跌幅≤-5% {int(breadth['weak'])}只"
     )
+
+
+def render_market_data_status(spot: pd.DataFrame) -> None:
+    quote_date: Any = None
+    source_warning = ""
+    valid_price_count = 0
+    if isinstance(spot, pd.DataFrame) and not spot.empty:
+        quote_date = spot.attrs.get("quote_date")
+        if not quote_date and "quote_date" in spot.columns:
+            parsed_dates = pd.to_datetime(spot["quote_date"], errors="coerce").dropna()
+            if not parsed_dates.empty:
+                quote_date = parsed_dates.max().date()
+        source_warning = str(spot.attrs.get("source_warning") or "")
+        if "price" in spot.columns:
+            valid_price_count = int(
+                (pd.to_numeric(spot["price"], errors="coerce").fillna(0) > 0).sum()
+            )
+
+    status = assess_market_data_status(
+        quote_date,
+        len(spot) if isinstance(spot, pd.DataFrame) else 0,
+        valid_price_count,
+        source_warning=source_warning,
+    )
+    date_text = format_date(status.quote_date) if status.quote_date else "未知"
+    summary = (
+        f"<strong>行情状态：{html_lib.escape(status.message)}</strong>"
+        f"<span>报价日 {html_lib.escape(date_text)} · "
+        f"有效报价 {status.valid_price_count:,}/{status.row_count:,}只 · "
+        f"来源 {html_lib.escape(status.source_label)}</span>"
+    )
+    st.markdown(
+        f'<div class="data-status data-status--{status.level}">{summary}</div>',
+        unsafe_allow_html=True,
+    )
+    if source_warning:
+        st.caption("数据源说明：" + source_warning)
 
 
 def latest_recommendation_set() -> tuple[dict[str, Any] | None, pd.DataFrame]:
@@ -3399,46 +3497,46 @@ with st.sidebar:
         )
     if max_price < min_price:
         st.warning("最高股价不能低于最低股价，刷新时会自动按最低股价处理。")
-    random_price_pick = st.checkbox(
-        "股价范围内随机抽样",
-        value=False,
-        help="开启后，会先按股价、成交额、资金面和基本面筛选，再从高分候选中随机抽取一部分进入K线复核，适合扩大发现面。",
-    )
     industry_filter = st.selectbox(
         "行业大类",
         ["全部", "电力", "机器人", "半导体", "人工智能", "新能源", "医药", "消费", "金融", "军工", "有色资源"],
     )
-    st.markdown("**综合筛选条件**")
-    require_fund_flow = st.checkbox(
-        "3日、5日、10日净流入均达标",
-        value=True,
-        help="三个周期分别达到阈值，不是三项相加。",
-    )
-    require_valuation = st.checkbox(
-        "市盈率（PE）、市净率（PB）处于同行业正常区间",
-        value=True,
-        help="估算市盈率和市净率均需处于同行业中位数的0.45至1.8倍。",
-    )
-    require_cashflow = st.checkbox(
-        "经营活动现金流良好",
-        value=True,
-        help="最近可用报告期的经营现金流净额和每股经营现金流均为正。",
-    )
-    require_dividend = st.checkbox(
-        "历史分红稳定",
-        value=True,
-        help="有效统计年份中至少80%有现金分红记录，且通常不少于4次。",
-    )
-    allow_near_match = st.checkbox(
-        "严格条件无结果时显示近似匹配",
-        value=True,
-        help="严格组合始终优先；仅在零结果时显示满足大部分条件的观察级候选，并逐只标明未满足项。",
-    )
-    ignore_proxy = st.toggle(
-        "忽略系统代理",
-        value=False,
-        help="开启后，行情接口请求会绕过电脑/服务器系统代理。若出现503、连接被重置、代理拦截等问题，可打开后重试。",
-    )
+    with st.expander("高级筛选与网络设置"):
+        random_price_pick = st.checkbox(
+            "股价范围内随机抽样",
+            value=False,
+            help="开启后，会先按股价、成交额、资金面和基本面筛选，再从高分候选中随机抽取一部分进入K线复核，适合扩大发现面。",
+        )
+        require_fund_flow = st.checkbox(
+            "3日、5日、10日净流入均达标",
+            value=True,
+            help="三个周期分别达到阈值，不是三项相加。",
+        )
+        require_valuation = st.checkbox(
+            "市盈率（PE）、市净率（PB）处于同行业正常区间",
+            value=True,
+            help="估算市盈率和市净率均需处于同行业中位数的0.45至1.8倍。",
+        )
+        require_cashflow = st.checkbox(
+            "经营活动现金流良好",
+            value=True,
+            help="最近可用报告期的经营现金流净额和每股经营现金流均为正。",
+        )
+        require_dividend = st.checkbox(
+            "历史分红稳定",
+            value=True,
+            help="有效统计年份中至少80%有现金分红记录，且通常不少于4次。",
+        )
+        allow_near_match = st.checkbox(
+            "严格条件无结果时显示近似匹配",
+            value=True,
+            help="严格组合始终优先；仅在零结果时显示满足大部分条件的观察级候选，并逐只标明未满足项。",
+        )
+        ignore_proxy = st.toggle(
+            "忽略系统代理",
+            value=False,
+            help="开启后，行情接口请求会绕过电脑/服务器系统代理。若出现503、连接被重置、代理拦截等问题，可打开后重试。",
+        )
     st.caption("先扫描全部A股的资金面与基本面，再对高分候选进行K线、成交量和买卖点复核。")
     st.page_link("pages/methodology.py", label="查看名词与筛选方法")
     st.page_link("pages/risk_disclosure.py", label="查看风险与合规说明")
@@ -3484,6 +3582,7 @@ if not recommendations.empty:
     if invalid_risk.any():
         st.warning("当前历史推荐中含旧版无效风控区间；页面已禁止显示为可开仓，刷新后会按新规则重算。")
 
+spot_dashboard = st.session_state.get("latest_spot_dashboard", pd.DataFrame())
 breadth = st.session_state.get("latest_breadth", {})
 global_indices = st.session_state.get("latest_global_indices", pd.DataFrame())
 global_summary = st.session_state.get("latest_global_summary", {})
@@ -3492,21 +3591,55 @@ if not breadth:
 if not breadth:
     try:
         with st.spinner("正在更新全市场宽度和全球指数"):
-            _spot_dashboard, breadth, global_indices, global_summary = load_market_dashboard(ignore_proxy)
+            spot_dashboard, breadth, global_indices, global_summary = load_market_dashboard(ignore_proxy)
+            st.session_state["latest_spot_dashboard"] = spot_dashboard
+            st.session_state["latest_breadth"] = breadth
+            st.session_state["latest_global_indices"] = global_indices
+            st.session_state["latest_global_summary"] = global_summary
     except Exception:
         breadth, global_indices, global_summary = {}, pd.DataFrame(), {}
+if not isinstance(spot_dashboard, pd.DataFrame) or spot_dashboard.empty:
+    spot_dashboard = load_cached_spot_snapshot()
 market_summary(breadth, global_summary)
+render_market_data_status(spot_dashboard)
 coverage = int(st.session_state.get("latest_fundamental_coverage", breadth.get("total", 0) if breadth else 0))
 report_date = str(st.session_state.get("latest_financial_report_date", ""))
 if coverage:
     report_note = f"，财报期 {format_date(report_date)}" if report_date else ""
     st.caption(f"本轮基本面/资金面覆盖 {coverage:,} 只A股{report_note}；K线只复核初筛后的高分候选。")
 
-refresh_col, hint_col = st.columns([0.22, 0.78])
+dashboard_notice = st.session_state.pop("dashboard_notice", "")
+if dashboard_notice:
+    st.success(dashboard_notice)
+
+market_refresh_col, refresh_col, hint_col = st.columns([0.16, 0.22, 0.62])
+with market_refresh_col:
+    market_refresh_clicked = st.button("只更新行情", width="stretch")
 with refresh_col:
     refresh_clicked = st.button("刷新并生成今日推荐", type="primary", width="stretch")
 with hint_col:
-    st.write("刷新后会按短期、中期、长期分别推荐，并把当天结果保存到本地数据库。")
+    st.write("“只更新行情”用于盘中快速确认市场；生成推荐会执行完整资金、基本面和K线扫描。")
+
+if market_refresh_clicked:
+    st.cache_data.clear()
+    try:
+        with st.spinner("正在更新全市场行情"):
+            spot_dashboard, breadth, global_indices, global_summary = load_market_dashboard(ignore_proxy)
+            st.session_state["latest_spot_dashboard"] = spot_dashboard
+            st.session_state["latest_breadth"] = breadth
+            st.session_state["latest_global_indices"] = global_indices
+            st.session_state["latest_global_summary"] = global_summary
+            save_market_snapshot(
+                run_id=int(current_run["id"]) if current_run and current_run.get("id") else None,
+                market=breadth,
+                global_summary=global_summary,
+                global_indices=global_indices,
+            )
+        st.session_state["dashboard_notice"] = "市场行情已更新，推荐列表未重新计算。"
+        st.rerun()
+    except Exception as exc:
+        LOGGER.exception("更新全市场行情失败")
+        st.error(friendly_data_source_error(exc, "更新市场行情"))
 
 if refresh_clicked:
     st.cache_data.clear()
@@ -3529,6 +3662,8 @@ if refresh_clicked:
                 allow_near_match=allow_near_match,
             )
             recommendations = hydrate(recommendations)
+            if isinstance(context.spot, pd.DataFrame) and not context.spot.empty:
+                st.session_state["latest_spot_dashboard"] = context.spot
         st.success(f"今日推荐已刷新并保存，共 {len(recommendations)} 只。")
         near_match_notes = [item for item in errors if str(item).startswith("严格组合筛选无结果")]
         if near_match_notes:
@@ -3556,29 +3691,28 @@ outcome_frame = load_recommendation_outcomes()
 sentiment_history = load_sentiment_history(limit=60)
 recommendations = enrich_recommendations_for_product(recommendations, outcome_frame, sentiment_history)
 
-tab_recommend, tab_condition, tab_commercial, tab_paper, tab_daily_review, tab_market_map, tab_theme, tab_capital, tab_mainline, tab_sentiment, tab_leader, tab_position_center, tab_alerts, tab_backtest_center, tab_stock, tab_data, tab_push = st.tabs(
-    [
-        "短中长期推荐",
-        "条件选股",
-        "商业体检",
-        "模拟交易",
-        "每日复盘",
-        "市场地图",
-        "行业题材",
-        "资金热点",
-        "主线雷达",
-        "情绪周期",
-        "龙头追踪",
-        "持仓中心",
-        "预警中心",
-        "策略回测",
-        "个股买卖点",
-        "数据表",
-        "推送",
-    ]
+st.divider()
+workspace = st.radio(
+    "工作区",
+    tuple(DASHBOARD_WORKSPACES),
+    horizontal=True,
+    label_visibility="collapsed",
+    key="dashboard_workspace",
 )
+module_col, module_hint_col = st.columns([0.3, 0.7])
+with module_col:
+    active_module = st.selectbox(
+        "当前功能",
+        DASHBOARD_WORKSPACES[workspace],
+        key=f"dashboard_module_{workspace}",
+    )
+with module_hint_col:
+    st.markdown(
+        f'<div class="workspace-hint">{html_lib.escape(DASHBOARD_MODULE_HINTS[active_module])}</div>',
+        unsafe_allow_html=True,
+    )
 
-with tab_recommend:
+if active_module == "短中长期推荐":
     if recommendations.empty:
         st.info("还没有推荐数据，点击上方“刷新并生成今日推荐”。")
     else:
@@ -3586,23 +3720,23 @@ with tab_recommend:
         with st.expander("查看推荐评分图"):
             st.plotly_chart(chart_scores(recommendations), width="stretch", config=PLOTLY_CONFIG)
 
-with tab_condition:
+if active_module == "条件选股":
     render_condition_selector_page(recommendations)
 
-with tab_commercial:
+if active_module == "商业体检":
     render_commercial_audit_page(recommendations, outcome_frame, breadth)
 
-with tab_paper:
+if active_module == "模拟交易":
     render_paper_trading_page(recommendations, outcome_frame)
 
-with tab_daily_review:
+if active_module == "每日复盘":
     capital_hotspots = st.session_state.get("latest_capital_hotspots", pd.DataFrame())
     if capital_hotspots.empty:
         selected_run_id = int(current_run["id"]) if current_run and current_run.get("id") else None
         capital_hotspots = load_capital_hotspots(run_id=selected_run_id)
     render_daily_review_page(recommendations, outcome_frame, capital_hotspots, breadth, global_summary, sentiment_history)
 
-with tab_market_map:
+if active_module == "市场地图":
     capital_hotspots = st.session_state.get("latest_capital_hotspots", pd.DataFrame())
     if capital_hotspots.empty:
         selected_run_id = int(current_run["id"]) if current_run and current_run.get("id") else None
@@ -3611,7 +3745,7 @@ with tab_market_map:
     hotspot_history = load_capital_hotspot_timeline()
     render_market_map_page(recommendations, capital_hotspots, ladder, hotspot_history)
 
-with tab_theme:
+if active_module == "行业题材":
     boards = st.session_state.get("latest_context_boards", pd.DataFrame())
     if boards.empty:
         st.info("刷新一次推荐后，这里会显示本轮使用的行业和题材热点。")
@@ -3658,7 +3792,7 @@ with tab_theme:
             f"综合分 {float(global_summary.get('score', 50)):.1f}。该因子只占推荐评分的小权重。"
         )
 
-with tab_capital:
+if active_module == "资金热点":
     capital_hotspots = st.session_state.get("latest_capital_hotspots", pd.DataFrame())
     if capital_hotspots.empty:
         selected_run_id = int(current_run["id"]) if current_run and current_run.get("id") else None
@@ -3667,7 +3801,7 @@ with tab_capital:
     st.caption("每日对应即时资金，每周对应5日排行，每月对应20日排行；单位为亿元。")
     render_capital_hotspots(capital_hotspots)
 
-with tab_mainline:
+if active_module == "主线雷达":
     capital_hotspots = st.session_state.get("latest_capital_hotspots", pd.DataFrame())
     if capital_hotspots.empty:
         selected_run_id = int(current_run["id"]) if current_run and current_run.get("id") else None
@@ -3675,14 +3809,14 @@ with tab_mainline:
     hotspot_history = load_capital_hotspot_timeline()
     render_mainline_radar(capital_hotspots, hotspot_history)
 
-with tab_sentiment:
+if active_module == "情绪周期":
     try:
         render_sentiment_cycle(breadth, ignore_proxy)
     except Exception:
         LOGGER.exception("市场情绪周期页面初始化失败")
         st.error("市场情绪周期暂时无法加载，其他功能不受影响。请稍后重试或联系管理员查看服务器日志。")
 
-with tab_leader:
+if active_module == "龙头追踪":
     capital_hotspots = st.session_state.get("latest_capital_hotspots", pd.DataFrame())
     if capital_hotspots.empty:
         selected_run_id = int(current_run["id"]) if current_run and current_run.get("id") else None
@@ -3690,20 +3824,20 @@ with tab_leader:
     boards = st.session_state.get("latest_context_boards", pd.DataFrame())
     render_leader_tracking(capital_hotspots, boards, ignore_proxy)
 
-with tab_position_center:
+if active_module == "持仓中心":
     render_position_center_page(ignore_proxy, recommendations, breadth, global_summary)
 
-with tab_alerts:
+if active_module == "预警中心":
     capital_hotspots = st.session_state.get("latest_capital_hotspots", pd.DataFrame())
     if capital_hotspots.empty:
         selected_run_id = int(current_run["id"]) if current_run and current_run.get("id") else None
         capital_hotspots = load_capital_hotspots(run_id=selected_run_id)
     render_alert_center_page(ignore_proxy, recommendations, capital_hotspots, sentiment_history)
 
-with tab_backtest_center:
+if active_module == "策略回测":
     render_strategy_backtest_center(recommendations, outcome_frame, ignore_proxy)
 
-with tab_stock:
+if active_module == "个股买卖点":
     initialize_position_inputs()
     st.subheader("输入股票名称或代码分析当天买卖点")
     query_col, years_col, button_col = st.columns([0.48, 0.2, 0.32])
@@ -4116,7 +4250,7 @@ with tab_stock:
                     st.dataframe(trades, width="stretch", hide_index=True)
             st.caption("该回测只验证技术策略，不还原历史时点的热点、资金流和财报快照，不代表未来收益。")
 
-with tab_data:
+if active_module == "数据表":
     st.subheader("数据与运行记录")
     runs = load_runs(limit=20)
     latest_status = RUN_STATUS_LABELS.get(str((current_run or {}).get("status", "")), "暂无")
@@ -4162,7 +4296,7 @@ with tab_data:
             mime="text/csv",
         )
 
-with tab_push:
+if active_module == "推送":
     st.subheader("推送今日推荐")
     if recommendations.empty:
         st.info("请先刷新生成今日推荐。")

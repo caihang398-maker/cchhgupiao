@@ -18,10 +18,12 @@ if str(ROOT) not in sys.path:
 RELEASE_DIR = ROOT / "release"
 TOP_LEVEL_FILES = {
     "app.py",
+    "CHANGELOG.md",
     "dashboard.py",
     "README.md",
     "requirements.txt",
     "requirements-server.txt",
+    "VERSION",
 }
 SOURCE_DIRECTORIES = {
     ".streamlit",

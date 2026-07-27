@@ -335,6 +335,23 @@ def _load_spot_reference() -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def load_cached_spot_snapshot() -> pd.DataFrame:
+    """Read the last complete quote snapshot without making a network request."""
+    cached = _load_spot_reference()
+    if cached.empty:
+        return cached
+    cached = cached.copy()
+    cached.attrs["origin_data_source"] = str(
+        cached.attrs.get("data_source") or cached.attrs.get("origin_data_source") or ""
+    )
+    cached.attrs["data_source"] = "本地行情快照"
+    cached.attrs["is_cache"] = True
+    cached.attrs["source_warning"] = (
+        str(cached.attrs.get("source_warning") or "") + "；当前页面读取本地缓存"
+    ).strip("；")
+    return cached
+
+
 def _merge_spot_liquidity(frame: pd.DataFrame, reference: pd.DataFrame) -> pd.DataFrame:
     """Use the last complete session only for fields that are zero before the open."""
     if frame.empty or reference.empty:
@@ -429,6 +446,7 @@ def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd
     frame = pd.DataFrame()
     universe_source = pd.DataFrame()
     fallback_warning = ""
+    source_name = "主行情源"
     for attempt in range(3):
         try:
             raw = ak.stock_zh_a_spot()
@@ -438,6 +456,7 @@ def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd
             findings = _spot_quality_findings(normalized, require_turnover=False)
             if not findings:
                 frame = normalized
+                source_name = "新浪行情"
                 break
             errors.append(f"新浪源第{attempt + 1}次质量不合格：{'、'.join(findings)}")
             if len(raw) >= MIN_SPOT_ROWS:
@@ -457,6 +476,7 @@ def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd
                 errors.append(f"东方财富备用源质量不合格：{'、'.join(findings)}")
             else:
                 frame = normalized
+                source_name = "东方财富行情"
         except Exception as exc:
             errors.append(f"东方财富备用源失败：{exc}")
 
@@ -472,6 +492,7 @@ def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd
                 errors.append(f"腾讯备用源质量不合格：{'、'.join(findings)}")
             else:
                 frame = normalized
+                source_name = "腾讯批量行情"
                 fallback_warning = "主行情源数据无效，已自动切换腾讯批量行情"
         except Exception as exc:
             errors.append(f"腾讯备用源失败：{exc}")
@@ -502,6 +523,7 @@ def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd
                     errors.append(f"同花顺即时行情质量不合格：{'、'.join(findings)}")
                 else:
                     frame = normalized
+                    source_name = "同花顺即时行情"
                     fallback_warning = "使用同花顺即时资金流行情完成扫描"
             else:
                 errors.append(f"同花顺即时行情返回不完整：{len(flow_spot)}只")
@@ -526,12 +548,18 @@ def _fetch_spot_once(ignore_proxy: bool = False, allow_cache: bool = True) -> pd
 
     if frame.empty and allow_cache:
         if not reference.empty:
+            reference = reference.copy()
+            reference.attrs["data_source"] = "本地行情快照"
+            reference.attrs["is_cache"] = True
             reference.attrs["source_warning"] = "实时行情源暂不可用，已使用最近一次完整行情快照"
             return reference
     if frame.empty:
         raise DataSourceError("无法获取有效实时行情：" + "；".join(errors[-6:]))
 
     frame = _stamp_spot_quote_date(frame)
+    frame.attrs["data_source"] = source_name
+    frame.attrs["is_cache"] = False
+    frame.attrs["fetched_at"] = datetime.now().isoformat(timespec="seconds")
     if fallback_warning:
         frame.attrs["source_warning"] = fallback_warning
     try:
@@ -558,6 +586,9 @@ def fetch_spot(ignore_proxy: bool = False) -> pd.DataFrame:
             errors.append(f"{'直连' if bypass_proxy else '系统代理'}：{exc}")
     cached = _load_spot_reference()
     if not cached.empty:
+        cached = cached.copy()
+        cached.attrs["data_source"] = "本地行情快照"
+        cached.attrs["is_cache"] = True
         cached.attrs["source_warning"] = "实时行情源暂不可用，已使用最近一次完整行情快照"
         return cached
     raise DataSourceError("无法获取实时行情：" + "；".join(errors[-2:]))

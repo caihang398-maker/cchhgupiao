@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -38,6 +38,7 @@ class MarketContext:
     fundamental_universe: pd.DataFrame
     financial_report_date: str
     errors: list[str]
+    spot: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 def _to_number(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
@@ -654,6 +655,7 @@ def scan_recommendations(
     if spot_warning:
         errors.append(f"行情数据提示：{spot_warning}")
     context = fetch_market_context(ignore_proxy=ignore_proxy)
+    context.spot = spot
     context.breadth = market_breadth(spot)
     errors.extend(context.errors)
     fundamental_snapshot = fetch_fundamental_snapshot(

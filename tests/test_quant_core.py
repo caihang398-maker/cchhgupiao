@@ -48,6 +48,7 @@ from stock_quant.fundamentals import (
 from stock_quant.health import (
     MYSQL_REQUIRED_COLUMNS,
     MYSQL_REQUIRED_VIEWS,
+    assess_market_data_status,
     assess_recommendation_freshness,
     assess_runtime_security,
     mysql_schema_findings,
@@ -145,6 +146,42 @@ class QuantCoreTests(unittest.TestCase):
         self.assertEqual(sunday_report.level, "fresh")
         self.assertEqual(monday_report.level, "aging")
         self.assertEqual(monday_report.weekdays_elapsed, 1)
+
+    def test_market_data_status_distinguishes_live_cache_and_stale_quotes(self) -> None:
+        trade_date = date(2026, 7, 17)
+        live = assess_market_data_status(
+            trade_date,
+            row_count=5_500,
+            valid_price_count=5_450,
+            today=trade_date,
+        )
+        cached = assess_market_data_status(
+            trade_date,
+            row_count=5_500,
+            valid_price_count=5_450,
+            source_warning="实时行情源暂不可用，已使用最近一次完整行情快照",
+            today=trade_date,
+        )
+        stale = assess_market_data_status(
+            trade_date,
+            row_count=5_500,
+            valid_price_count=5_450,
+            today=date(2026, 7, 20),
+        )
+        self.assertEqual(live.level, "fresh")
+        self.assertEqual(cached.level, "cached")
+        self.assertTrue(cached.is_cached)
+        self.assertEqual(stale.level, "stale")
+
+    def test_market_data_status_rejects_low_price_coverage(self) -> None:
+        report = assess_market_data_status(
+            date(2026, 7, 17),
+            row_count=5_500,
+            valid_price_count=2_000,
+            today=date(2026, 7, 17),
+        )
+        self.assertEqual(report.level, "degraded")
+        self.assertIn("2,000/5,500", report.message)
 
     def test_mysql_schema_check_finds_missing_column_and_view(self) -> None:
         tables = set(MYSQL_REQUIRED_COLUMNS)
