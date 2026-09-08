@@ -1,0 +1,60 @@
+<view class="page">
+  <view class="page-title">条件选股</view>
+  <view class="page-subtitle">先组合条件，再查看每只股票的买点、止损和失效原因。</view>
+
+  <view class="panel filter-panel">
+    <view class="field-label">筛选条件</view>
+    <checkbox-group class="condition-grid" bindchange="selectConditions">
+      <label wx:for="{{conditionOptions}}" wx:key="name" class="condition-item">
+        <checkbox value="{{item.name}}" checked="{{item.checked}}" color="#1d4ed8" />
+        <text>{{item.name}}</text>
+      </label>
+    </checkbox-group>
+
+    <view class="slider-field">
+      <view class="row"><text class="field-label">最低综合评分</text><text class="slider-value">{{minScore}}分</text></view>
+      <slider min="50" max="95" step="1" value="{{minScore}}" activeColor="#1d4ed8" bindchange="changeScore" />
+    </view>
+    <view class="slider-field">
+      <view class="row"><text class="field-label">最高建议仓位</text><text class="slider-value">{{maxPositionPercent}}%</text></view>
+      <slider min="5" max="60" step="5" value="{{maxPositionPercent}}" activeColor="#1d4ed8" bindchange="changePosition" />
+    </view>
+    <view class="field">
+      <text class="field-label">股价范围（元，可选）</text>
+      <view class="price-range">
+        <input class="field-input price-input" type="digit" data-field="minPrice" value="{{minPrice}}" bindinput="handlePrice" placeholder="最低价" />
+        <text class="price-separator">至</text>
+        <input class="field-input price-input" type="digit" data-field="maxPrice" value="{{maxPrice}}" bindinput="handlePrice" placeholder="最高价" />
+      </view>
+    </view>
+    <view class="random-row">
+      <view class="grow">
+        <view class="field-label random-label">随机抽样</view>
+        <view class="caption">从已满足条件的股票中随机展示，扩大观察面。</view>
+      </view>
+      <switch checked="{{randomPick}}" color="#1d4ed8" bindchange="toggleRandomPick" />
+    </view>
+    <view wx:if="{{randomPick}}" class="slider-field">
+      <view class="row"><text class="field-label">随机展示数量</text><text class="slider-value">{{randomCount}}只</text></view>
+      <slider min="1" max="30" step="1" value="{{randomCount}}" activeColor="#1d4ed8" bindchange="changeRandomCount" />
+    </view>
+    <view class="field">
+      <text class="field-label">行业、题材或名称（可选）</text>
+      <input class="field-input" value="{{keyword}}" bindinput="handleKeyword" placeholder="例如：证券、高股息" />
+    </view>
+    <button class="primary-button" loading="{{loading}}" bindtap="runScreener">生成筛选结果</button>
+  </view>
+
+  <status-banner level="{{freshness.level}}" message="{{freshness.message}}" />
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+
+  <view class="section-heading result-heading">
+    <text class="section-title">筛选结果</text>
+    <text class="caption">推荐池{{poolCount}}只 · 命中{{resultCount}}只</text>
+  </view>
+  <view wx:if="{{loading}}" class="loading">正在组合筛选条件...</view>
+  <block wx:else>
+    <stock-card wx:for="{{items}}" wx:key="id" item="{{item}}" bindselect="openStock" />
+    <view wx:if="{{!items.length && !error}}" class="empty panel">当前条件没有命中。可降低评分或减少筛选条件。</view>
+  </block>
+</view>

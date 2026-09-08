@@ -1,0 +1,27 @@
+.risk-section {
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-left: 6rpx solid #94a3b8;
+  border-radius: 10rpx;
+  color: #4b5563;
+  line-height: 1.7;
+}
+
+.risk-section .section-title {
+  margin-bottom: 12rpx;
+  color: #111827;
+}
+
+.risk-blue {
+  border-left-color: #2563eb;
+}
+
+.risk-yellow {
+  border-left-color: #d97706;
+}
+
+.risk-red {
+  border-left-color: #dc2626;
+}

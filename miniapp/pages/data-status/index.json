@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "数据体检",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "status-banner": "/components/status-banner/index"
+  }
+}

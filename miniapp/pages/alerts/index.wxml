@@ -1,0 +1,47 @@
+<view class="page">
+  <view class="page-head">
+    <view>
+      <view class="page-title">预警中心</view>
+      <view class="page-subtitle">跟踪买点、止损、资金、板块和情绪条件。</view>
+    </view>
+    <button class="add-button" bindtap="addAlert">新增</button>
+  </view>
+
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <button class="evaluate-button" loading="{{evaluating}}" bindtap="evaluate">立即检查预警条件</button>
+
+  <view class="section quick-section">
+    <view class="section-heading"><text class="section-title">一键建立保护</text><text class="caption">自动去重</text></view>
+    <view class="quick-grid">
+      <button data-scope="recommendations" loading="{{quickScope === 'recommendations'}}" bindtap="createQuickAlerts">推荐池</button>
+      <button data-scope="positions" loading="{{quickScope === 'positions'}}" bindtap="createQuickAlerts">我的持仓</button>
+      <button data-scope="market" loading="{{quickScope === 'market'}}" bindtap="createQuickAlerts">市场情绪</button>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading">正在读取预警...</view>
+  <block wx:else>
+    <view class="section">
+      <view class="section-heading"><text class="section-title">预警规则</text><text class="caption">{{rules.length}}条</text></view>
+      <view wx:if="{{!rules.length}}" class="empty panel">还没有预警规则。</view>
+      <view wx:for="{{rules}}" wx:key="id" class="rule-item">
+        <view class="grow">
+          <view class="rule-type">{{item.alert_type}}</view>
+          <view class="rule-target">{{item.target_text}}</view>
+          <view wx:if="{{item.note}}" class="rule-note">{{item.note}}</view>
+        </view>
+        <switch checked="{{item.enabled_bool}}" color="#1d4ed8" data-id="{{item.id}}" bindchange="toggleRule" />
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-heading"><text class="section-title">最近触发</text><text class="caption">{{events.length}}条</text></view>
+      <view wx:if="{{!events.length}}" class="empty panel">暂无触发记录，点击上方按钮检查。</view>
+      <view wx:for="{{events}}" wx:key="id" class="event-item {{item.severity_class}}">
+        <view class="event-head"><text>{{item.alert_type}}</text><text>{{item.severity}}</text></view>
+        <view class="event-message">{{item.message}}</view>
+        <view class="event-time">{{item.time_text}}</view>
+      </view>
+    </view>
+  </block>
+</view>

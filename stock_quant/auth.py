@@ -52,16 +52,25 @@ def _utcnow_naive() -> datetime:
 
 
 def _is_service_valid(user: dict[str, Any], now: datetime | None = None) -> bool:
+    return _service_status(user, now) == "active"
+
+
+def _service_status(user: dict[str, Any], now: datetime | None = None) -> str:
     current = now or _utcnow_naive()
+    if user.get("deleted_at") is not None:
+        return "deleted"
+    if user.get("status") != "active":
+        return "disabled"
+
     start = user.get("service_started_at")
     end = user.get("service_expires_at")
-    return (
-        user.get("status") == "active"
-        and user.get("deleted_at") is None
-        and start is not None
-        and end is not None
-        and start <= current < end
-    )
+    if start is None or end is None:
+        return "not_opened"
+    if start > current:
+        return "not_started"
+    if end <= current:
+        return "expired"
+    return "active"
 
 
 def _user_query(identifier_clause: str) -> str:
@@ -81,6 +90,7 @@ def _user_query(identifier_clause: str) -> str:
 
 def _public_user(row: dict[str, Any]) -> dict[str, Any]:
     roles = [value for value in str(row.get("role_codes") or "").split(",") if value]
+    service_status = _service_status(row)
     return {
         "id": int(row["id"]),
         "login_name": row.get("login_name"),
@@ -91,6 +101,8 @@ def _public_user(row: dict[str, Any]) -> dict[str, Any]:
         "service_expires_at": row.get("service_expires_at"),
         "roles": roles,
         "is_admin": "ADMIN" in roles,
+        "service_status": service_status,
+        "service_valid": service_status == "active",
     }
 
 
@@ -138,8 +150,8 @@ def authenticate(identifier: str, password: str, ip_address: str | None = None) 
                     """,
                     (attempts, locked_until, user["id"]),
                 )
-            elif not _is_service_valid(user, now):
-                failure_reason = "账号未开通、已到期或已被停用"
+            elif _service_status(user, now) in {"disabled", "deleted"}:
+                failure_reason = "账号已被停用，请联系管理员"
 
             cursor.execute(
                 """
@@ -193,7 +205,11 @@ def refresh_user(user_id: int) -> dict[str, Any] | None:
         with connection.cursor() as cursor:
             cursor.execute(_user_query("u.id = %s"), (user_id,))
             user = cursor.fetchone()
-        if not user or not _is_service_valid(user):
+        if (
+            not user
+            or user.get("deleted_at") is not None
+            or user.get("status") != "active"
+        ):
             return None
         return _public_user(user)
     finally:

@@ -1,0 +1,33 @@
+<view class="page">
+  <view class="page-title">选股研究</view>
+  <view class="page-subtitle">搜索代码、名称、行业或题材，查看买点与风险位。</view>
+
+  <view class="screener-entry" bindtap="openScreener">
+    <view><view class="screener-title">组合条件选股</view><view class="screener-caption">资金、技术、买点、估值与可信度联合筛选</view></view>
+    <text>›</text>
+  </view>
+
+  <view class="search-row">
+    <view class="search-box">
+      <icon type="search" size="18" color="#6b7280" />
+      <input value="{{keyword}}" bindinput="handleKeyword" bindconfirm="submitSearch" confirm-type="search" placeholder="代码、名称、行业、题材" />
+    </view>
+    <button class="search-button" bindtap="submitSearch">搜索</button>
+  </view>
+
+  <view class="segments">
+    <view class="segment {{horizon === '' ? 'active' : ''}}" data-horizon="" bindtap="selectHorizon">全部</view>
+    <view class="segment {{horizon === 'short' ? 'active' : ''}}" data-horizon="short" bindtap="selectHorizon">短期</view>
+    <view class="segment {{horizon === 'mid' ? 'active' : ''}}" data-horizon="mid" bindtap="selectHorizon">中期</view>
+    <view class="segment {{horizon === 'long' ? 'active' : ''}}" data-horizon="long" bindtap="selectHorizon">长期</view>
+  </view>
+
+  <status-banner level="{{freshness.level}}" message="{{freshness.message}}" />
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <view class="result-count">找到 {{total}} 只</view>
+  <view wx:if="{{loading}}" class="loading">正在筛选...</view>
+  <block wx:else>
+    <stock-card wx:for="{{items}}" wx:key="id" item="{{item}}" bindselect="openStock" />
+    <view wx:if="{{!items.length}}" class="empty">没有符合条件的股票，请缩短关键词或切换周期。</view>
+  </block>
+</view>

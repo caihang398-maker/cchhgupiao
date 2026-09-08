@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="page-title">我的</view>
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <view wx:if="{{loading}}" class="loading">正在读取账号...</view>
+  <block wx:else>
+    <view class="profile-panel">
+      <view class="avatar">{{avatarText}}</view>
+      <view class="grow">
+        <view class="profile-name">{{user.real_name || '用户'}}</view>
+        <view class="profile-account">{{accountText}}</view>
+      </view>
+      <view class="status-tag">{{statusText}}</view>
+    </view>
+
+    <view class="section metrics">
+      <view class="metric"><view class="metric-label">会员状态</view><view class="metric-value profile-value">{{statusText}}</view></view>
+      <view class="metric"><view class="metric-label">到期时间</view><view class="metric-value profile-value">{{expiryText}}</view></view>
+    </view>
+
+    <view class="section">
+      <view class="section-heading"><text class="section-title">功能中心</text></view>
+      <view class="menu-list">
+        <view class="menu-item" bindtap="openSubscription"><view><text class="menu-title">会员与订阅</text><text class="menu-caption">查看有效期、套餐和当前开通方式</text></view><text class="menu-arrow">›</text></view>
+        <view class="menu-item" bindtap="openPaper"><view><text class="menu-title">模拟交易账户</text><text class="menu-caption">验证推荐收益、胜率和回撤</text></view><text class="menu-arrow">›</text></view>
+        <view class="menu-item" bindtap="openScreener"><view><text class="menu-title">组合条件选股</text><text class="menu-caption">资金、技术、买点和可信度联合筛选</text></view><text class="menu-arrow">›</text></view>
+        <view class="menu-item" bindtap="openDataStatus"><view><text class="menu-title">数据体检中心</text><text class="menu-caption">日期、覆盖率、失败原因和备用数据</text></view><text class="menu-arrow">›</text></view>
+        <view class="menu-item" bindtap="openMarket"><view><text class="menu-title">市场地图与情绪</text><text class="menu-caption">行业题材、资金热点、涨停梯队</text></view><text class="menu-arrow">›</text></view>
+        <view class="menu-item" bindtap="openReview"><view><text class="menu-title">推荐可信度复盘</text><text class="menu-caption">胜率、收益、回撤与目标触达</text></view><text class="menu-arrow">›</text></view>
+        <view class="menu-item" bindtap="openRisk"><view><text class="menu-title">风险与数据说明</text><text class="menu-caption">数据时效、失效条件与使用边界</text></view><text class="menu-arrow">›</text></view>
+      </view>
+    </view>
+
+    <view class="section panel pc-note">
+      <view class="section-title">PC 端继续负责</view>
+      <view class="caption">全市场刷新、策略回测、批量导出、会员管理、支付配置和管理员审计。这些操作保持在原 PC 系统，避免手机误触高风险任务。</view>
+    </view>
+
+    <button class="logout-button" bindtap="logout">退出登录</button>
+    <view class="version">小程序版 1.1 · 与 PC 端共享业务数据</view>
+  </block>
+</view>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta
@@ -13,6 +14,7 @@ from .settings import DATA_DIR, STRATEGY_VERSION
 
 
 DB_PATH = DATA_DIR / "stock_recommendations.sqlite3"
+SQLITE_JOURNAL_MODES = {"delete", "truncate", "persist", "memory", "wal", "off"}
 
 
 def connect(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
@@ -22,7 +24,10 @@ def connect(db_path: str | Path = DB_PATH) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("pragma foreign_keys = on")
     conn.execute("pragma busy_timeout = 10000")
-    conn.execute("pragma journal_mode = wal")
+    journal_mode = os.getenv("STOCK_QUANT_SQLITE_JOURNAL_MODE", "wal").strip().lower()
+    if journal_mode not in SQLITE_JOURNAL_MODES:
+        journal_mode = "wal"
+    conn.execute(f"pragma journal_mode = {journal_mode}")
     conn.execute("pragma synchronous = normal")
     init_db(conn)
     return conn

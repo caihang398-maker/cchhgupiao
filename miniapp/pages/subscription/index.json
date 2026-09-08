@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "会员与订阅",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "status-banner": "/components/status-banner/index"
+  }
+}

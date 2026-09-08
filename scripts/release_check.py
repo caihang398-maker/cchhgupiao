@@ -17,6 +17,11 @@ from stock_quant.health import (
 )
 from stock_quant.settings import CACHE_DIR, DATA_DIR, REPORTS_DIR
 from stock_quant.storage import DB_PATH, db_connection, latest_run, mark_stale_running_runs
+from stock_quant.payments import (
+    PaymentConfigurationError,
+    load_creem_config,
+    payment_enabled,
+)
 
 
 REQUIRED_MODULES = (
@@ -67,6 +72,19 @@ def main() -> int:
     runtime_safety = assess_runtime_security(auth_is_enabled=auth_enabled())
     failures.extend(runtime_safety.failures)
     warnings.extend(runtime_safety.warnings)
+    payment_on = payment_enabled()
+    if payment_on and not auth_enabled():
+        failures.append("启用在线订阅时必须同时设置 AUTH_ENABLED=true。")
+    if payment_on:
+        try:
+            payment_config = load_creem_config(
+                require_api_key=True,
+                require_webhook_secret=True,
+            )
+            if payment_config.environment == "test":
+                warnings.append("Creem 当前为测试模式，不会产生真实扣款。")
+        except PaymentConfigurationError as exc:
+            failures.append(f"Creem支付配置无效：{exc}")
 
     for module_name in REQUIRED_MODULES:
         try:
@@ -135,7 +153,12 @@ def main() -> int:
                     for table_name, column_name in cursor.fetchall():
                         columns_by_table.setdefault(str(table_name), set()).add(str(column_name))
                     failures.extend(
-                        mysql_schema_findings(table_names, view_names, columns_by_table)
+                        mysql_schema_findings(
+                            table_names,
+                            view_names,
+                            columns_by_table,
+                            include_payment=payment_on,
+                        )
                     )
                     if not failures:
                         cursor.execute("select 1 from v_user_account_status limit 1")

@@ -1,0 +1,111 @@
+.profile-panel {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 26rpx;
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 12rpx;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 86rpx;
+  height: 86rpx;
+  color: #ffffff;
+  background: #1d4ed8;
+  border-radius: 10rpx;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.profile-name {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.profile-account {
+  margin-top: 7rpx;
+  color: #6b7280;
+  font-size: 24rpx;
+}
+
+.status-tag {
+  padding: 8rpx 12rpx;
+  color: #047857;
+  background: #ecfdf5;
+  border-radius: 6rpx;
+  font-size: 22rpx;
+}
+
+.profile-value {
+  font-size: 27rpx;
+}
+
+.menu-list {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 12rpx;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 24rpx;
+  border-bottom: 1rpx solid #f0f2f5;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-title,
+.menu-caption {
+  display: block;
+}
+
+.menu-title {
+  font-weight: 600;
+}
+
+.menu-caption {
+  margin-top: 7rpx;
+  color: #6b7280;
+  font-size: 23rpx;
+}
+
+.menu-arrow {
+  color: #1d4ed8;
+  font-size: 40rpx;
+}
+
+.pc-note {
+  border-left: 6rpx solid #d97706;
+}
+
+.pc-note .caption {
+  margin-top: 12rpx;
+}
+
+.logout-button {
+  min-height: 80rpx;
+  margin-top: 34rpx;
+  color: #b91c1c;
+  background: #ffffff;
+  border: 1rpx solid #fecaca;
+  border-radius: 10rpx;
+  font-size: 27rpx;
+  line-height: 80rpx;
+}
+
+.version {
+  margin-top: 24rpx;
+  color: #9ca3af;
+  font-size: 22rpx;
+  text-align: center;
+}

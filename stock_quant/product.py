@@ -529,20 +529,44 @@ def evaluate_alert_rules(
         observed = None
         message = ""
         severity = "提示"
-        if alert_type in {"到达买点", "跌破止损"} and rec is not None:
+        if alert_type in {"到达买点", "跌破止损"} and symbol:
             code = symbol[-6:]
             spot_row = spot_by_code.get(code)
-            observed = _num(spot_row.get("price")) if spot_row is not None else _num(rec.get("close"))
+            observed = (
+                _num(spot_row.get("price"))
+                if spot_row is not None
+                else (_num(rec.get("close")) if rec is not None else 0.0)
+            )
             if alert_type == "到达买点":
-                low = _num(rec.get("buy_zone_low"))
-                high = _num(rec.get("buy_zone_high"))
-                if low <= observed <= high:
-                    message = f"{symbol} {rec.get('name', '')} 当前价{observed:.2f}进入买点区间{low:.2f}-{high:.2f}。"
+                if rec is not None:
+                    low = _num(rec.get("buy_zone_low"))
+                    high = _num(rec.get("buy_zone_high"))
+                    matched = low > 0 and low <= observed <= high
+                    target_text = f"买点区间{low:.2f}-{high:.2f}"
+                    display_name = rec.get("name", "")
+                else:
+                    threshold = _num(rule.get("threshold_value"))
+                    comparator = str(rule.get("comparator") or "进入区间")
+                    low = threshold * 0.995
+                    high = threshold * 1.005
+                    matched = (
+                        threshold > 0
+                        and (
+                            (comparator == ">=" and observed >= threshold)
+                            or (comparator == "<=" and observed <= threshold)
+                            or (comparator == "进入区间" and low <= observed <= high)
+                        )
+                    )
+                    target_text = f"自定义价格{threshold:.2f}"
+                    display_name = rule.get("name", "")
+                if matched:
+                    message = f"{symbol} {display_name} 当前价{observed:.2f}到达{target_text}。"
                     severity = "机会"
             else:
-                stop = _num(rec.get("stop_loss"))
-                if observed <= stop:
-                    message = f"{symbol} {rec.get('name', '')} 当前价{observed:.2f}跌破止损位{stop:.2f}。"
+                stop = _num(rec.get("stop_loss")) if rec is not None else _num(rule.get("threshold_value"))
+                display_name = rec.get("name", "") if rec is not None else rule.get("name", "")
+                if stop > 0 and observed > 0 and observed <= stop:
+                    message = f"{symbol} {display_name} 当前价{observed:.2f}跌破止损位{stop:.2f}。"
                     severity = "风险"
         elif alert_type == "主力资金连续流入" and rec is not None:
             if _num(rec.get("net_inflow_3d")) > 0 and _num(rec.get("net_inflow_5d")) > 0 and _num(rec.get("net_inflow_10d")) > 0:

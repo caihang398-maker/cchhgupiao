@@ -1,0 +1,47 @@
+<view class="page">
+  <view class="page-title">模拟交易</view>
+  <view class="page-subtitle">先用历史推荐验证策略纪律，不连接券商、不提交真实订单。</view>
+
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <view wx:if="{{loading}}" class="loading">正在读取模拟账户...</view>
+  <block wx:else>
+    <view class="metrics">
+      <view wx:for="{{metrics}}" wx:key="label" class="metric">
+        <view class="metric-label">{{item.label}}</view>
+        <view class="metric-value paper-value {{item.risk ? 'down' : ''}}">{{item.value}}</view>
+      </view>
+    </view>
+
+    <view class="section panel">
+      <view class="section-title">生成模拟买入</view>
+      <view class="caption form-caption">只选择尚未模拟过的当前推荐，按100股整数倍计算。</view>
+      <view class="field">
+        <text class="field-label">初始模拟资金</text>
+        <input class="field-input" type="digit" data-field="initialCash" value="{{initialCash}}" bindinput="handleAmount" />
+      </view>
+      <view class="field">
+        <text class="field-label">单只模拟投入</text>
+        <input class="field-input" type="digit" data-field="cashPerTrade" value="{{cashPerTrade}}" bindinput="handleAmount" />
+      </view>
+      <view class="field">
+        <view class="row"><text class="field-label">本次最多买入</text><text class="count-value">{{maxCount}}只</text></view>
+        <slider min="1" max="10" step="1" value="{{maxCount}}" activeColor="#1d4ed8" bindchange="changeCount" />
+      </view>
+      <button class="primary-button generate-button" loading="{{generating}}" bindtap="generate">生成模拟买入</button>
+    </view>
+
+    <view class="section">
+      <view class="section-heading"><text class="section-title">交易记录</text><text class="caption">{{trades.length}}条</text></view>
+      <view wx:if="{{!trades.length}}" class="empty panel">暂无模拟交易，可先生成一组用于观察。</view>
+      <view wx:for="{{trades}}" wx:key="id" class="trade-item" data-symbol="{{item.symbol}}" bindtap="openStock">
+        <view class="row row-start">
+          <view class="grow"><view class="trade-name">{{item.name || item.symbol}}</view><view class="trade-meta">{{item.symbol}} · {{item.date_text}} · {{item.status}}</view></view>
+          <text class="trade-return {{item.return_class}}">{{item.return_text}}</text>
+        </view>
+        <view class="trade-foot"><text>买入价 {{item.price_text}}</text><text>{{item.shares}}股</text><text>¥{{item.amount_text}}</text></view>
+      </view>
+    </view>
+
+    <view class="risk-note">模拟收益取自系统已保存的推荐复盘，不代表真实成交、滑点或未来收益。</view>
+  </block>
+</view>

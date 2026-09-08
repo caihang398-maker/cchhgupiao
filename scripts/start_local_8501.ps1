@@ -6,6 +6,9 @@ New-Item -ItemType Directory -Path (Join-Path $ProjectRoot "logs") -Force | Out-
 $env:AUTH_ENABLED = "false"
 $env:APP_ENV = "local"
 $env:PYTHONUTF8 = "1"
+$LocalNoProxy = "127.0.0.1,localhost,::1"
+$env:NO_PROXY = if ($env:NO_PROXY) { "$LocalNoProxy,$env:NO_PROXY" } else { $LocalNoProxy }
+$env:no_proxy = $env:NO_PROXY
 
 $Python = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $Python)) {

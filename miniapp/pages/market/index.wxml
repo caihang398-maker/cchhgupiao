@@ -1,0 +1,46 @@
+<view class="page">
+  <view class="page-title">市场地图</view>
+  <view class="page-subtitle">先看市场温度与情绪阶段，再看行业和题材方向。</view>
+  <status-banner level="{{freshness.level}}" message="{{freshness.message}}" />
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <view wx:if="{{loading}}" class="loading">正在读取市场数据...</view>
+  <block wx:else>
+    <view class="section metrics">
+      <view wx:for="{{metrics}}" wx:key="label" class="metric"><view class="metric-label">{{item.label}}</view><view class="metric-value market-value">{{item.value}}</view></view>
+    </view>
+
+    <view class="section panel" wx:if="{{sentiment}}">
+      <view class="row"><view class="section-title">大A情绪</view><view class="stage-tag">{{sentiment.emotion_stage}} {{sentiment.score_text}}分</view></view>
+      <view class="sentiment-grid">
+        <view><text>涨停</text><text class="strong">{{sentiment.limit_up_count}}</text></view>
+        <view><text>炸板率</text><text class="strong">{{sentiment.broken_text}}</text></view>
+        <view><text>最高连板</text><text class="strong">{{sentiment.max_streak}}</text></view>
+        <view><text>晋级率</text><text class="strong">{{sentiment.promotion_text}}</text></view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-heading"><text class="section-title">主线方向</text></view>
+      <view wx:for="{{marketMap}}" wx:key="direction" class="map-item">
+        <view class="row"><view><text class="map-name">{{item.direction}}</text><text class="map-type">{{item.type}}</text></view><text class="stage stage-{{item.stage}}">{{item.stage}}</text></view>
+        <view class="map-info">龙头 {{item.leader}} · 持续 {{item.duration}}天 · 均分 {{item.score}}</view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-heading"><text class="section-title">当日资金热点</text></view>
+      <view wx:for="{{hotspots}}" wx:key="id" class="hotspot-item">
+        <view><text class="hotspot-rank">{{item.rank}}</text><text class="hotspot-name">{{item.name}}</text><text class="map-type">{{item.category}}</text></view>
+        <view class="hotspot-values"><text class="{{item.net_inflow_yi >= 0 ? 'up' : 'down'}}">{{item.flow_text}}</text><text>{{item.change_text}}</text></view>
+      </view>
+    </view>
+
+    <view class="section" wx:if="{{ladder.length}}">
+      <view class="section-heading"><text class="section-title">涨停梯队</text></view>
+      <view wx:for="{{ladder}}" wx:key="id" class="ladder-item">
+        <view><text class="hotspot-name">{{item.name}}</text><text class="map-type">{{item.symbol}}</text></view>
+        <view><text class="streak">{{item.streak}}板</text><text class="map-type">{{item.industry}}</text></view>
+      </view>
+    </view>
+  </block>
+</view>

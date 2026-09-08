@@ -1,0 +1,25 @@
+<view class="page">
+  <view class="page-title">风险与数据说明</view>
+  <view class="page-subtitle">使用任何推荐前，先确认数据日期、买点、止损和失效条件。</view>
+
+  <view class="risk-section risk-blue">
+    <view class="section-title">数据时效</view>
+    <view>小程序与 PC 端读取同一套数据库。全市场扫描仍由 PC 端或服务器定时任务完成，小程序不会在后台自动启动大规模扫描。</view>
+  </view>
+  <view class="risk-section risk-yellow">
+    <view class="section-title">推荐边界</view>
+    <view>评分、胜率、T+1/T+5/T+20收益和最大回撤来自历史样本，只描述过去，不保证未来。样本数量不足时可信度会显示为“样本积累”。</view>
+  </view>
+  <view class="risk-section risk-red">
+    <view class="section-title">交易纪律</view>
+    <view>不使用“必涨、稳赚、保本”作为决策依据。每次操作都要同时确认仓位上限、止损价格、流动性和板块退潮信号。</view>
+  </view>
+  <view class="risk-section">
+    <view class="section-title">做T方案</view>
+    <view>做T区间是情景推演。A股当天买入的股票通常不能当天卖出，手续费、滑点、成交量和价格跳空都会导致实际结果不同。</view>
+  </view>
+  <view class="risk-section">
+    <view class="section-title">真实交易</view>
+    <view>当前小程序不连接券商、不自动下单。东吴证券接口开通后也应先做行情只读、模拟单、人工确认，再评估自动交易。</view>
+  </view>
+</view>

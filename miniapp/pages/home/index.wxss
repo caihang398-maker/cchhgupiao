@@ -1,0 +1,107 @@
+.home-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.sentiment-pill {
+  max-width: 260rpx;
+  margin-top: 16rpx;
+  padding: 10rpx 14rpx;
+  color: #92400e;
+  background: #fffbeb;
+  border-radius: 8rpx;
+  font-size: 23rpx;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.summary-metrics {
+  margin-top: 22rpx;
+}
+
+.compact-value {
+  font-size: 29rpx;
+}
+
+.metric-link {
+  border-color: #bfdbfe;
+}
+
+.metric-link .metric-value {
+  color: #1d4ed8;
+}
+
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  min-height: 112rpx;
+  margin-bottom: 12rpx;
+  padding: 18rpx 20rpx;
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-left: 7rpx solid #60a5fa;
+  border-radius: 10rpx;
+}
+
+.action-risk {
+  border-left-color: #dc2626;
+  background: #fffafa;
+}
+
+.action-warning {
+  border-left-color: #d97706;
+  background: #fffdf5;
+}
+
+.action-opportunity,
+.action-success {
+  border-left-color: #059669;
+}
+
+.action-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.action-title {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.action-detail {
+  margin-top: 6rpx;
+  color: #6b7280;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.action-arrow {
+  color: #9ca3af;
+  font-size: 42rpx;
+}
+
+.segments {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8rpx;
+  margin-bottom: 18rpx;
+  padding: 6rpx;
+  background: #e5e7eb;
+  border-radius: 10rpx;
+}
+
+.segment {
+  padding: 14rpx 4rpx;
+  color: #4b5563;
+  border-radius: 7rpx;
+  text-align: center;
+}
+
+.segment.active {
+  color: #1d4ed8;
+  background: #ffffff;
+  font-weight: 600;
+}

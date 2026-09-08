@@ -1,0 +1,26 @@
+<view class="stock-card" bindtap="handleTap">
+  <view class="stock-head">
+    <view class="stock-name-wrap">
+      <text class="stock-name">{{item.name}}</text>
+      <text class="stock-symbol">{{item.symbol}}</text>
+    </view>
+    <view class="score-wrap">
+      <text class="score">{{item.score}}</text>
+      <text class="score-label">综合分</text>
+    </view>
+  </view>
+  <view class="stock-tags">
+    <text class="stock-tag stock-tag-blue">{{item.horizon_label}}</text>
+    <text class="stock-tag">{{item.strategy_type}}</text>
+    <text class="stock-tag {{item.priority === '重点' ? 'stock-tag-red' : ''}}">{{item.priority}}</text>
+  </view>
+  <view class="stock-grid">
+    <view><text class="label">参考价</text><text class="value">{{display.close}}</text></view>
+    <view><text class="label">可信度</text><text class="value">{{display.credibility}}分</text></view>
+    <view><text class="label">建议仓位</text><text class="value">{{display.position}}</text></view>
+  </view>
+  <view class="stock-action">
+    <text>{{item.action}}</text>
+    <text class="arrow">›</text>
+  </view>
+</view>

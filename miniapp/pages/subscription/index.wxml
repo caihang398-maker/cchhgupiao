@@ -1,0 +1,75 @@
+<view class="page subscription-page">
+  <view class="page-title">会员与订阅</view>
+  <view class="page-subtitle">查看服务有效期与可选周期。支付能力未满足条件时不会产生订单或扣款。</view>
+
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <view wx:if="{{loading}}" class="loading">正在读取会员信息...</view>
+
+  <block wx:else>
+    <view class="membership-summary">
+      <view class="summary-main">
+        <view class="summary-label">当前状态</view>
+        <view class="summary-status">{{statusText}}</view>
+        <view class="summary-expiry">到期时间：{{expiryText}}</view>
+      </view>
+      <view class="days-box">
+        <view class="days-value">{{remainingText}}</view>
+        <view class="days-label">剩余时间</view>
+      </view>
+    </view>
+
+    <view class="payment-notice {{payment.eligible ? 'notice-eligible' : ''}}">
+      <view class="notice-title">当前开通方式</view>
+      <view class="notice-text">{{payment.message}}</view>
+      <view class="payment-checklist" wx:if="{{payment.checklist.length}}">
+        <view class="checklist-item" wx:for="{{payment.checklist}}" wx:key="key">
+          <text class="checklist-state {{item.ready ? 'checklist-ready' : ''}}">{{item.ready ? '已完成' : '待完成'}}</text>
+          <text class="checklist-label">{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-heading plans-heading">
+      <text class="section-title">套餐周期</text>
+      <text class="caption">价格以管理员最终配置为准</text>
+    </view>
+
+    <view class="plan-list">
+      <view
+        wx:for="{{plans}}"
+        wx:key="plan_code"
+        class="plan-item {{item.recommended ? 'plan-recommended' : ''}}"
+      >
+        <view class="plan-top">
+          <view>
+            <view class="plan-name-row">
+              <text class="plan-name">{{item.plan_name}}</text>
+              <text wx:if="{{item.recommended}}" class="recommend-tag">常用</text>
+            </view>
+            <view class="plan-duration">{{item.durationText}}</view>
+          </view>
+          <view class="plan-price">{{item.priceText}}</view>
+        </view>
+        <view class="feature-row">
+          <text wx:for="{{item.features}}" wx:key="*this" class="feature-item">{{item}}</text>
+        </view>
+        <button
+          class="plan-button"
+          data-index="{{index}}"
+          bindtap="choosePlan"
+        >{{payment.enabled ? '选择套餐' : '查看开通说明'}}</button>
+      </view>
+    </view>
+
+    <view class="identity-note">
+      <view class="notice-title">微信快捷登录</view>
+      <view class="notice-text">{{login.identity_note}}</view>
+      <view class="notice-text" wx:if="{{login.wechat_direct_login}}">首次进入可自动建立 {{login.trial_days}} 天体验账号。</view>
+    </view>
+
+    <view class="subscription-actions">
+      <button wx:if="{{serviceValid}}" class="primary-button action-button" bindtap="openHome">进入系统</button>
+      <button class="secondary-button action-button" bindtap="openProfile">返回我的</button>
+    </view>
+  </block>
+</view>

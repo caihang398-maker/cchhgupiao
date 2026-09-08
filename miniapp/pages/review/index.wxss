@@ -1,0 +1,64 @@
+.summary-card,
+.report-item {
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 12rpx;
+}
+
+.summary-title {
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.sample,
+.report-date {
+  color: #6b7280;
+  font-size: 23rpx;
+}
+
+.returns,
+.review-grid {
+  display: grid;
+  gap: 12rpx;
+  margin-top: 20rpx;
+}
+
+.returns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.review-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-top: 18rpx;
+  border-top: 1rpx solid #f0f2f5;
+}
+
+.returns text,
+.returns .strong,
+.review-grid text,
+.review-grid .strong {
+  display: block;
+}
+
+.returns text,
+.review-grid text {
+  color: #6b7280;
+  font-size: 22rpx;
+}
+
+.returns .strong,
+.review-grid .strong {
+  margin-top: 6rpx;
+}
+
+.report-title {
+  font-weight: 700;
+}
+
+.report-summary {
+  margin-top: 12rpx;
+  color: #4b5563;
+  line-height: 1.6;
+}

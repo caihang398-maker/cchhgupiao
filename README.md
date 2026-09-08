@@ -24,6 +24,28 @@ streamlit run app.py
 http://localhost:8501
 ```
 
+## 微信小程序
+
+仓库中的 [`miniapp/`](miniapp) 是独立的原生微信小程序前端，PC 端仍保持原来的
+Streamlit 页面和 `8501` 端口。小程序通过独立的 `8512` API 读取同一套推荐、持仓、
+预警和会员数据。
+
+本机启动小程序 API：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start_miniapp_local.ps1
+```
+
+然后使用微信开发者工具导入 `miniapp` 目录。首次开发可使用测试号，并在开发者工具中
+临时关闭合法域名校验；体验版和正式版必须使用已配置的 HTTPS 合法域名。
+
+完整的 AppID、微信快捷登录、个人主体虚拟支付准备、MySQL 迁移、HTTPS 反向代理和上传发布步骤见
+[`docs/wechat_miniapp_setup.md`](docs/wechat_miniapp_setup.md)。
+
+使用微信云开发/云托管部署小程序 API 时，使用独立 Docker 入口和双传输开关，具体见
+[`docs/cloudbase_miniapp_deployment.md`](docs/cloudbase_miniapp_deployment.md)。该方案不会替换 PC 端
+`8501` 服务；未启用云环境时，小程序继续使用现有接口。
+
 ## 从 GitHub 安装
 
 ```powershell
@@ -67,6 +89,8 @@ powershell -ExecutionPolicy Bypass -File scripts\start_local_8501.ps1
 - 数据存储：推荐结果按天写入本地 SQLite 数据库。
 - 会员权限：可配置启用 MySQL 登录，未登录无法访问业务页面；账号按月开通并校验到期时间。
 - 管理员后台：管理员可创建、续费、停用和恢复会员，并查看有效、即将到期和已到期账号。
+- 在线订阅：支持 Creem 测试结账、签名回调、幂等续期、订单记录和管理员支付审计；正式收款默认关闭。
+- 微信小程序：独立移动端提供微信免密码登录、月/季/半年/年订阅展示、今日行动清单、条件选股、股票搜索、日K线、可信度、市场地图、持仓做T方案、一键预警、模拟交易、数据体检和复盘；与PC端共享业务数据。
 - SaaS 数据库设计：已提供 MySQL 5.7 账号权限、订阅到期、订单支付、审计和用户逐日查询记录结构。
 
 做T规划只用于情景推演。A股当天新买入股票不能当天卖出，区间会随行情变化；系统不会保证成交、盈利或回本。
@@ -98,6 +122,9 @@ Windows Server 2016 + MySQL 5.7 的 SaaS 数据库方案见
 
 Windows Server 正式发布、备份、计划任务和 IIS 安全配置见
 [`docs/release_guide.md`](docs/release_guide.md)。
+
+Creem 测试订阅、回调服务、MySQL 迁移和正式模式启用步骤见
+[`docs/creem_subscription_setup.md`](docs/creem_subscription_setup.md)。
 
 发布前建议执行：
 

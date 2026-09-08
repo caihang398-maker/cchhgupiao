@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "推荐复盘",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "status-banner": "/components/status-banner/index"
+  }
+}

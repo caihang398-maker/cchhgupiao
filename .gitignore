@@ -32,3 +32,4 @@ logs/
 *.sql.gz
 *.bak
 .streamlit/secrets.toml
+miniapp/project.private.config.json

@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "新增预警",
+  "usingComponents": {
+    "status-banner": "/components/status-banner/index"
+  }
+}

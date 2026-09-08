@@ -1,0 +1,35 @@
+<view class="page">
+  <view class="page-head">
+    <view><view class="page-title">数据体检</view><view class="page-subtitle">检查时间 {{checkedText}}</view></view>
+    <view class="ready-tag {{ready ? 'ready' : 'not-ready'}}">{{ready ? '可用于复核' : '暂缓决策'}}</view>
+  </view>
+
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <view wx:if="{{loading}}" class="loading">正在检查本地数据和备用链路...</view>
+  <block wx:else>
+    <status-banner level="{{recommendation.level}}" message="{{recommendation.message}}" />
+    <status-banner level="{{market.level}}" message="{{market.message}}" />
+
+    <view class="section metrics">
+      <view wx:for="{{marketMetrics}}" wx:key="label" class="metric">
+        <view class="metric-label">{{item.label}}</view>
+        <view class="metric-value data-value">{{item.value}}</view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-heading"><text class="section-title">模块状态</text><text class="caption">失败时自动说明备用方案</text></view>
+      <view wx:for="{{items}}" wx:key="name" class="source-item">
+        <view class="row row-start">
+          <view class="grow"><view class="source-name">{{item.name}}</view><view class="source-time">{{item.updated_at}}</view></view>
+          <text class="source-status {{item.status_class}}">{{item.status}}</text>
+        </view>
+        <view class="source-line"><text>覆盖</text><text>{{item.coverage}}</text></view>
+        <view class="source-line"><text>失败原因</text><text>{{item.failure_reason}}</text></view>
+        <view class="source-line"><text>备用方案</text><text>{{item.fallback}}</text></view>
+      </view>
+    </view>
+
+    <view class="decision-rule">只有数据日期、覆盖率和来源状态同时可靠时，才进入个股买点与止损复核。</view>
+  </block>
+</view>

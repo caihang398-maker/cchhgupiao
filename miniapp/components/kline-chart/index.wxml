@@ -1,0 +1,4 @@
+<view class="chart-wrap">
+  <canvas wx:if="{{bars.length}}" class="chart" canvas-id="klineCanvas" id="klineCanvas"></canvas>
+  <view wx:else class="chart-empty">暂无K线数据</view>
+</view>

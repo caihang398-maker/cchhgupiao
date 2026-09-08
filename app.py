@@ -129,49 +129,75 @@ if auth_required:
                 st.Page(render_login, title="登录", url_path="risk-disclosure"),
                 st.Page(render_login, title="登录", url_path="recommendation-review"),
                 st.Page(render_login, title="登录", url_path="admin-accounts"),
+                st.Page(render_login, title="登录", url_path="subscription"),
             ],
             position="hidden",
         ).run()
         st.stop()
 
-pages = [
-    st.Page(
-        "dashboard.py",
-        title="量化推荐",
-        url_path="",
-        default=True,
-    ),
-    st.Page(
-        "pages/methodology.py",
-        title="名词与方法",
-        url_path="methodology",
-    ),
-    st.Page(
-        "pages/risk_disclosure.py",
-        title="风险与合规",
-        url_path="risk-disclosure",
-    ),
-    st.Page(
-        "pages/recommendation_review.py",
-        title="推荐复盘",
-        url_path="recommendation-review",
-    ),
-]
-if user and user.get("is_admin"):
-    pages.append(
+service_valid = bool(user and user.get("service_valid"))
+is_admin = bool(user and user.get("is_admin"))
+if user and not service_valid and not is_admin:
+    pages = [
         st.Page(
-            "pages/admin_accounts.py",
-            title="账号管理",
-            url_path="admin-accounts",
+            "pages/subscription.py",
+            title="订阅与续费",
+            url_path="subscription",
+            default=True,
+        ),
+        st.Page(
+            "pages/risk_disclosure.py",
+            title="风险与合规",
+            url_path="risk-disclosure",
+        ),
+    ]
+else:
+    pages = [
+        st.Page(
+            "dashboard.py",
+            title="量化推荐",
+            url_path="",
+            default=True,
+        ),
+        st.Page(
+            "pages/methodology.py",
+            title="名词与方法",
+            url_path="methodology",
+        ),
+        st.Page(
+            "pages/risk_disclosure.py",
+            title="风险与合规",
+            url_path="risk-disclosure",
+        ),
+        st.Page(
+            "pages/recommendation_review.py",
+            title="推荐复盘",
+            url_path="recommendation-review",
+        ),
+    ]
+    if user:
+        pages.append(
+            st.Page(
+                "pages/subscription.py",
+                title="订阅与续费",
+                url_path="subscription",
+            )
         )
-    )
+    if is_admin:
+        pages.append(
+            st.Page(
+                "pages/admin_accounts.py",
+                title="账号管理",
+                url_path="admin-accounts",
+            )
+        )
 personal_trading_enabled = os.getenv("ENABLE_PERSONAL_TRADING", "false").strip().lower() in {
     "1",
     "true",
     "yes",
     "on",
 }
-if personal_trading_enabled and ((user and user.get("is_admin")) or not auth_required):
+if personal_trading_enabled and (is_admin or not auth_required):
     pages.append(
         st.Page(
             "pages/personal_trading.py",
@@ -186,6 +212,13 @@ if user:
     with st.sidebar:
         st.caption(f"{user['real_name']} · {user['mobile']}")
         st.caption(f"到期：{format_utc_datetime(user['service_expires_at'])}")
+        service_labels = {
+            "active": "服务有效",
+            "expired": "服务已到期",
+            "not_opened": "尚未开通",
+            "not_started": "服务尚未开始",
+        }
+        st.caption(f"状态：{service_labels.get(user.get('service_status'), '待管理员处理')}")
         if st.button("退出登录", width="stretch"):
             for key in list(st.session_state):
                 if key.startswith("position_input_") or key in {

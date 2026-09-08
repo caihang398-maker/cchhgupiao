@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "条件选股",
+  "usingComponents": {
+    "status-banner": "/components/status-banner/index",
+    "stock-card": "/components/stock-card/index"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "股票详情",
+  "usingComponents": {
+    "status-banner": "/components/status-banner/index",
+    "kline-chart": "/components/kline-chart/index"
+  }
+}

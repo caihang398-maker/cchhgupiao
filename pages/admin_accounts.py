@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -25,6 +26,15 @@ from stock_quant.auth import (
 )
 from stock_quant.commercial import order_summary, user_behavior_frames, user_behavior_summary
 from stock_quant.notify import mask_webhook_url, validate_webhook_url
+from stock_quant.payments import (
+    creem_environment,
+    list_payment_subscriptions,
+    list_payment_webhook_events,
+    list_provider_product_mappings,
+    payment_enabled,
+    payment_tables_available,
+    save_provider_product_mapping,
+)
 from stock_quant.product import membership_value_metrics
 from stock_quant.presentation import (
     ACCOUNT_STATUS_LABELS,
@@ -109,6 +119,18 @@ try:
 except Exception:
     LOGGER.exception("读取通知通道失败")
     channels = pd.DataFrame()
+payment_tables_ready = False
+provider_products = pd.DataFrame()
+provider_subscriptions = pd.DataFrame()
+webhook_events = pd.DataFrame()
+try:
+    payment_tables_ready = payment_tables_available()
+    if payment_tables_ready:
+        provider_products = pd.DataFrame(list_provider_product_mappings())
+        provider_subscriptions = pd.DataFrame(list_payment_subscriptions(limit=500))
+        webhook_events = pd.DataFrame(list_payment_webhook_events(limit=500))
+except Exception:
+    LOGGER.exception("读取 Creem 订阅配置失败")
 
 ops = membership_value_metrics(accounts, periods, query_records, daily_usage)
 st.markdown("**会员运营看板**")
@@ -138,6 +160,7 @@ biz_cols[5].metric("试用订单", str(orders_summary["trial_count"]))
     plan_tab,
     order_tab,
     payment_tab,
+    creem_tab,
     notify_tab,
     renew_tab,
     query_tab,
@@ -151,6 +174,7 @@ biz_cols[5].metric("试用订单", str(orders_summary["trial_count"]))
         "套餐管理",
         "订单流水",
         "支付流水",
+        "Creem订阅",
         "通知通道",
         "续费记录",
         "查询记录",
@@ -483,7 +507,7 @@ with order_tab:
         st.dataframe(display, width="stretch", hide_index=True)
 
 with payment_tab:
-    st.caption("支付流水用于后续对账、退款和收入统计。当前支持线下记账，后续可接微信/支付宝正式支付。")
+    st.caption("支付流水用于对账、退款和收入统计，包含后台手工记账与 Creem 签名回调确认的在线付款。")
     if payments.empty:
         st.info("暂无支付流水。")
     else:
@@ -506,6 +530,204 @@ with payment_tab:
             if column in display:
                 display[column] = display[column].map(format_utc_datetime)
         st.dataframe(display, width="stretch", hide_index=True)
+
+with creem_tab:
+    st.subheader("Creem 在线订阅")
+    configured_environment = "未配置"
+    try:
+        configured_environment = "正式" if creem_environment() == "live" else "测试"
+    except Exception as exc:
+        st.error(str(exc))
+    prefix = "CREEM_LIVE" if configured_environment == "正式" else "CREEM_TEST"
+    config_cols = st.columns(4)
+    config_cols[0].metric("在线订阅", "已开启" if payment_enabled() else "未开启")
+    config_cols[1].metric("当前环境", configured_environment)
+    config_cols[2].metric("接口密钥", "已设置" if os.getenv(f"{prefix}_API_KEY", "").strip() else "未设置")
+    config_cols[3].metric(
+        "回调密钥",
+        "已设置" if os.getenv(f"{prefix}_WEBHOOK_SECRET", "").strip() else "未设置",
+    )
+    st.caption(
+        "Creem 结账支持银行卡、Apple Pay 和 Google Pay。中国个人收款人的支付宝配置属于商户结算，"
+        "不是买家结账时的支付宝付款方式。"
+    )
+    if not payment_tables_ready:
+        st.error("支付数据库表尚未安装，请先执行 database/migrations/20260729_creem_subscriptions.sql。")
+    elif plans.empty:
+        st.info("请先在“套餐管理”中创建至少一个启用套餐。")
+    else:
+        plan_options = {
+            f"{int(row['id'])} · {row['plan_name']} · {int(row['duration_months'])}个月": int(row["id"])
+            for _, row in plans.iterrows()
+            if str(row.get("status") or "") == "active"
+        }
+        if not plan_options:
+            st.info("当前没有启用套餐。")
+        else:
+            with st.form("creem_product_mapping_form", border=True):
+                left, middle, right = st.columns(3)
+                with left:
+                    selected_plan = st.selectbox("本地会员套餐", list(plan_options))
+                    mapping_environment = st.selectbox(
+                        "支付环境",
+                        ["test", "live"],
+                        format_func=lambda value: "测试" if value == "test" else "正式",
+                    )
+                with middle:
+                    external_product_id = st.text_input(
+                        "Creem 产品编号",
+                        placeholder="prod_xxxxxxxxx",
+                    )
+                    provider_price_minor = st.number_input(
+                        "渠道金额（最小货币单位）",
+                        min_value=1,
+                        value=1000,
+                        step=1,
+                        help="例如 EUR 10.00 填写 1000。",
+                    )
+                with right:
+                    provider_currency = st.selectbox("渠道币种", ["EUR", "USD"])
+                    mapping_status = st.selectbox(
+                        "映射状态",
+                        ["active", "disabled"],
+                        format_func=lambda value: "启用" if value == "active" else "停用",
+                    )
+                mapping_saved = st.form_submit_button("保存产品映射", type="primary")
+            if mapping_saved:
+                try:
+                    mapping_id = save_provider_product_mapping(
+                        plan_options[selected_plan],
+                        mapping_environment,
+                        external_product_id,
+                        int(provider_price_minor),
+                        provider_currency,
+                        mapping_status,
+                    )
+                    st.success(f"Creem 产品映射已保存，编号：{mapping_id}")
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
+                except Exception:
+                    LOGGER.exception("保存 Creem 产品映射失败")
+                    st.error("保存产品映射失败，请查看服务日志。")
+
+        st.markdown("**套餐与 Creem 产品映射**")
+        if provider_products.empty:
+            st.info("尚未配置产品映射。")
+        else:
+            display = provider_products.rename(
+                columns={
+                    "id": "映射编号",
+                    "plan_code": "套餐编码",
+                    "plan_name": "套餐名称",
+                    "duration_months": "服务月数",
+                    "environment": "环境",
+                    "external_product_id": "Creem产品编号",
+                    "provider_price_minor": "渠道金额（最小单位）",
+                    "provider_currency": "渠道币种",
+                    "status": "状态",
+                    "updated_at": "更新时间",
+                }
+            )
+            display["环境"] = display["环境"].map({"test": "测试", "live": "正式"})
+            display["状态"] = display["状态"].map({"active": "启用", "disabled": "停用"})
+            display["更新时间"] = display["更新时间"].map(format_utc_datetime)
+            st.dataframe(
+                display[
+                    [
+                        "映射编号",
+                        "套餐编码",
+                        "套餐名称",
+                        "服务月数",
+                        "环境",
+                        "Creem产品编号",
+                        "渠道金额（最小单位）",
+                        "渠道币种",
+                        "状态",
+                        "更新时间",
+                    ]
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
+        st.markdown("**在线订阅状态**")
+        if provider_subscriptions.empty:
+            st.info("暂无 Creem 在线订阅。")
+        else:
+            display = provider_subscriptions.rename(
+                columns={
+                    "mobile": "手机号",
+                    "real_name": "姓名",
+                    "plan_name": "套餐",
+                    "environment": "环境",
+                    "provider_subscription_id": "Creem订阅编号",
+                    "status": "订阅状态",
+                    "current_period_start_at": "本期开始",
+                    "current_period_end_at": "本期结束",
+                    "next_transaction_at": "下次扣款时间",
+                    "canceled_at": "取消时间",
+                    "updated_at": "更新时间",
+                }
+            )
+            display["环境"] = display["环境"].map({"test": "测试", "live": "正式"})
+            for column in ("本期开始", "本期结束", "下次扣款时间", "取消时间", "更新时间"):
+                display[column] = display[column].map(format_utc_datetime)
+            st.dataframe(
+                display[
+                    [
+                        "手机号",
+                        "姓名",
+                        "套餐",
+                        "环境",
+                        "Creem订阅编号",
+                        "订阅状态",
+                        "本期开始",
+                        "本期结束",
+                        "下次扣款时间",
+                        "取消时间",
+                        "更新时间",
+                    ]
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
+        with st.expander("查看最近支付回调"):
+            if webhook_events.empty:
+                st.info("尚未收到 Creem 回调。")
+            else:
+                display = webhook_events.rename(
+                    columns={
+                        "event_id": "事件编号",
+                        "event_type": "事件类型",
+                        "environment": "环境",
+                        "process_status": "处理状态",
+                        "attempts": "处理次数",
+                        "error_message": "错误信息",
+                        "received_at": "接收时间",
+                        "processed_at": "完成时间",
+                    }
+                )
+                display["环境"] = display["环境"].map({"test": "测试", "live": "正式"})
+                for column in ("接收时间", "完成时间"):
+                    display[column] = display[column].map(format_utc_datetime)
+                st.dataframe(
+                    display[
+                        [
+                            "事件编号",
+                            "事件类型",
+                            "环境",
+                            "处理状态",
+                            "处理次数",
+                            "错误信息",
+                            "接收时间",
+                            "完成时间",
+                        ]
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
 
 with notify_tab:
     st.caption("先支持企业微信/钉钉/飞书机器人配置；短信先预留配置入口，等你确定服务商后接入。")

@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "选股研究",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "status-banner": "/components/status-banner/index",
+    "stock-card": "/components/stock-card/index"
+  }
+}

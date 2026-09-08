@@ -1,0 +1,55 @@
+<view class="page">
+  <view class="page-title">录入持仓</view>
+  <view class="page-subtitle">数量与可卖底仓按100股整数填写。</view>
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+
+  <view class="panel form-panel">
+    <view class="field">
+      <text class="field-label">股票名称或代码</text>
+      <input class="field-input" data-field="symbol" value="{{form.symbol}}" bindinput="handleInput" placeholder="例如：601088 或 中国神华" />
+    </view>
+    <view class="two-columns">
+      <view class="field">
+        <text class="field-label">持仓成本</text>
+        <input class="field-input" type="digit" data-field="cost_price" value="{{form.cost_price}}" bindinput="handleInput" placeholder="0.00" />
+      </view>
+      <view class="field">
+        <text class="field-label">持股数量</text>
+        <input class="field-input" type="number" data-field="shares" value="{{form.shares}}" bindinput="handleInput" />
+      </view>
+    </view>
+    <view class="two-columns">
+      <view class="field">
+        <text class="field-label">可用资金</text>
+        <input class="field-input" type="digit" data-field="available_cash" value="{{form.available_cash}}" bindinput="handleInput" />
+      </view>
+      <view class="field">
+        <text class="field-label">账户总资产</text>
+        <input class="field-input" type="digit" data-field="account_assets" value="{{form.account_assets}}" bindinput="handleInput" />
+      </view>
+    </view>
+    <view class="field">
+      <text class="field-label">今日可卖底仓</text>
+      <input class="field-input" type="number" data-field="sellable_shares" value="{{form.sellable_shares}}" bindinput="handleInput" />
+    </view>
+    <view class="two-columns">
+      <view class="field">
+        <text class="field-label">单次做T比例</text>
+        <picker range="{{ratios}}" value="{{ratioIndex}}" bindchange="selectRatio">
+          <view class="field-picker"><text>{{ratios[ratioIndex]}}%</text><text>⌄</text></view>
+        </picker>
+      </view>
+      <view class="field">
+        <text class="field-label">做T方式</text>
+        <picker range="{{preferences}}" value="{{preferenceIndex}}" bindchange="selectPreference">
+          <view class="field-picker"><text>{{preferences[preferenceIndex]}}</text><text>⌄</text></view>
+        </picker>
+      </view>
+    </view>
+    <view class="field">
+      <text class="field-label">备注</text>
+      <textarea class="field-textarea" data-field="note" value="{{form.note}}" bindinput="handleInput" placeholder="例如：计划三个月降低成本" />
+    </view>
+    <button class="primary-button" loading="{{saving}}" bindtap="save">保存到持仓中心</button>
+  </view>
+</view>

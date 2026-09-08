@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "市场地图",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "status-banner": "/components/status-banner/index"
+  }
+}

@@ -1,7 +1,9 @@
 param(
     [string]$TargetRoot = "E:\stock-quant",
     [string]$TaskName = "StockQuantWeb",
-    [int]$WebPort = 8501
+    [string]$PaymentTaskName = "StockQuantPaymentWebhook",
+    [int]$WebPort = 8501,
+    [int]$PaymentWebhookPort = 8511
 )
 
 $ErrorActionPreference = "Stop"
@@ -98,9 +100,15 @@ foreach ($RelativePath in $Files) {
 }
 
 $Task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+$PaymentTask = Get-ScheduledTask -TaskName $PaymentTaskName -ErrorAction SilentlyContinue
 if ($Task) {
     Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 5
+}
+if ($PaymentTask) {
+    Stop-ScheduledTask -TaskName $PaymentTaskName -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    Stop-WebListener -Port $PaymentWebhookPort
 }
 
 Stop-WebListener -Port $WebPort
@@ -154,6 +162,9 @@ try {
     }
 
     Start-WebService -ScheduledTask $Task -Name $TaskName -Root $TargetRoot -Port $WebPort
+    if ($PaymentTask) {
+        Start-ScheduledTask -TaskName $PaymentTaskName
+    }
 
     $Health = $null
     $LastHealthError = $null
@@ -182,12 +193,50 @@ try {
         throw "Health check failed after waiting. Last error: $LastHealthError`nTask info: $TaskInfo`nRecent server log:`n$RecentLog"
     }
 
+    $PaymentHealth = $null
+    $LastPaymentHealthError = $null
+    if ($PaymentTask) {
+        for ($Attempt = 1; $Attempt -le 20; $Attempt++) {
+            try {
+                $PaymentHealth = Invoke-WebRequest `
+                    -UseBasicParsing `
+                    -Uri "http://127.0.0.1:$PaymentWebhookPort/health" `
+                    -TimeoutSec 5
+                if ($PaymentHealth.StatusCode -eq 200) {
+                    break
+                }
+            } catch {
+                $LastPaymentHealthError = $_
+            }
+            Start-Sleep -Seconds 2
+        }
+        if (-not $PaymentHealth -or $PaymentHealth.StatusCode -ne 200) {
+            $PaymentTaskInfo = Get-ScheduledTaskInfo `
+                -TaskName $PaymentTaskName `
+                -ErrorAction SilentlyContinue
+            $PaymentLog = ""
+            $PaymentLogPath = Join-Path $TargetRoot "logs\payment-webhook.log"
+            if (Test-Path -LiteralPath $PaymentLogPath) {
+                $PaymentLog = (Get-Content -LiteralPath $PaymentLogPath -Tail 80) -join "`n"
+            }
+            throw "Payment webhook health check failed. Last error: $LastPaymentHealthError`nTask info: $PaymentTaskInfo`nRecent payment log:`n$PaymentLog"
+        }
+    }
+
     Write-Host "Update completed."
     Write-Host "Backup: $BackupRoot"
     Write-Host "Health: $($Health.StatusCode) $($Health.Content.Trim())"
+    if ($PaymentHealth) {
+        Write-Host "Payment health: $($PaymentHealth.StatusCode) $($PaymentHealth.Content.Trim())"
+    }
 } catch {
     Write-Warning "Update failed. Restoring the backup."
 
+    if ($PaymentTask) {
+        Stop-ScheduledTask -TaskName $PaymentTaskName -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        Stop-WebListener -Port $PaymentWebhookPort
+    }
     Stop-WebListener -Port $WebPort
 
     foreach ($RelativePath in $Files) {
@@ -201,6 +250,9 @@ try {
 
     try {
         Start-WebService -ScheduledTask $Task -Name $TaskName -Root $TargetRoot -Port $WebPort
+        if ($PaymentTask) {
+            Start-ScheduledTask -TaskName $PaymentTaskName
+        }
     } catch {
         Write-Warning "Backup was restored, but the previous service could not be restarted: $_"
     }

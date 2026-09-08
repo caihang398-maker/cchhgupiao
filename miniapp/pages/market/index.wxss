@@ -1,0 +1,97 @@
+.market-value {
+  font-size: 28rpx;
+}
+
+.stage-tag,
+.stage {
+  padding: 7rpx 12rpx;
+  color: #92400e;
+  background: #fffbeb;
+  border-radius: 6rpx;
+  font-size: 22rpx;
+}
+
+.sentiment-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10rpx;
+  margin-top: 22rpx;
+}
+
+.sentiment-grid text,
+.sentiment-grid .strong {
+  display: block;
+  text-align: center;
+}
+
+.sentiment-grid text {
+  color: #6b7280;
+  font-size: 21rpx;
+}
+
+.sentiment-grid .strong {
+  margin-top: 7rpx;
+  overflow-wrap: anywhere;
+}
+
+.map-item,
+.hotspot-item,
+.ladder-item {
+  padding: 20rpx 22rpx;
+  margin-bottom: 12rpx;
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 10rpx;
+}
+
+.map-name,
+.hotspot-name {
+  margin-right: 12rpx;
+  font-weight: 700;
+}
+
+.map-type {
+  color: #6b7280;
+  font-size: 22rpx;
+}
+
+.map-info {
+  margin-top: 12rpx;
+  color: #6b7280;
+  font-size: 23rpx;
+}
+
+.hotspot-item,
+.ladder-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14rpx;
+}
+
+.hotspot-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40rpx;
+  height: 40rpx;
+  margin-right: 12rpx;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-radius: 6rpx;
+  font-size: 22rpx;
+}
+
+.hotspot-values {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  text-align: right;
+  font-size: 23rpx;
+}
+
+.streak {
+  margin-right: 12rpx;
+  color: #b91c1c;
+  font-weight: 700;
+}

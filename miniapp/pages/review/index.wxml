@@ -1,0 +1,22 @@
+<view class="page">
+  <view class="page-title">推荐复盘</view>
+  <view class="page-subtitle">用历史结果校验策略，不用单次涨跌判断策略好坏。</view>
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <view wx:if="{{loading}}" class="loading">正在读取复盘...</view>
+  <block wx:else>
+    <view wx:if="{{!summaries.length}}" class="empty panel">复盘样本仍在积累。</view>
+    <view wx:for="{{summaries}}" wx:key="horizon" class="summary-card">
+      <view class="row"><text class="summary-title">{{item.horizon}}</text><text class="sample">{{item.count}}条推荐</text></view>
+      <view class="returns"><view><text>T+1</text><text class="strong">{{item.t1}}</text></view><view><text>T+5</text><text class="strong">{{item.t5}}</text></view><view><text>T+20</text><text class="strong">{{item.t20}}</text></view></view>
+      <view class="review-grid"><view><text>5日上涨率</text><text class="strong">{{item.win5}}</text></view><view><text>最差回撤</text><text class="strong">{{item.drawdown}}</text></view><view><text>止损率</text><text class="strong">{{item.stop}}</text></view><view><text>目标率</text><text class="strong">{{item.target}}</text></view></view>
+    </view>
+
+    <view class="section" wx:if="{{reports.length}}">
+      <view class="section-heading"><text class="section-title">每日复盘摘要</text></view>
+      <view wx:for="{{reports}}" wx:key="id" class="report-item">
+        <view class="row"><text class="report-title">{{item.title}}</text><text class="report-date">{{item.date_text}}</text></view>
+        <view class="report-summary">{{item.summary}}</view>
+      </view>
+    </view>
+  </block>
+</view>

@@ -1,0 +1,46 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/home/index",
+    "pages/research/index",
+    "pages/positions/index",
+    "pages/alerts/index",
+    "pages/profile/index",
+    "pages/subscription/index",
+    "pages/screener/index",
+    "pages/paper/index",
+    "pages/data-status/index",
+    "pages/stock/detail",
+    "pages/position/edit",
+    "pages/alert/edit",
+    "pages/market/index",
+    "pages/review/index",
+    "pages/risk/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "A股量化助手",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f4f6f8",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#6b7280",
+    "selectedColor": "#1d4ed8",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "今日" },
+      { "pagePath": "pages/research/index", "text": "研究" },
+      { "pagePath": "pages/positions/index", "text": "持仓" },
+      { "pagePath": "pages/alerts/index", "text": "预警" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  },
+  "networkTimeout": {
+    "request": 60000
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
+  "sitemapLocation": "sitemap.json"
+}

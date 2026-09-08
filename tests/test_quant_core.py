@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import unittest
 from datetime import date
@@ -1278,6 +1279,16 @@ class QuantCoreTests(unittest.TestCase):
             self.assertEqual(int(runs.iloc[0]["id"]), run_id)
             self.assertEqual(runs.iloc[0]["strategy_version"], STRATEGY_VERSION)
             self.assertIn("行业筛选", runs.iloc[0]["parameters_json"])
+
+    def test_sqlite_can_use_delete_journal_for_single_cloud_instance(self) -> None:
+        with TemporaryDirectory() as directory, patch.dict(
+            os.environ,
+            {"STOCK_QUANT_SQLITE_JOURNAL_MODE": "delete"},
+            clear=False,
+        ):
+            db_path = Path(directory) / "cloud.sqlite3"
+            with db_connection(db_path) as connection:
+                self.assertEqual(connection.execute("pragma journal_mode").fetchone()[0], "delete")
 
     def test_product_credibility_strategy_and_market_map(self) -> None:
         outcomes = pd.DataFrame(

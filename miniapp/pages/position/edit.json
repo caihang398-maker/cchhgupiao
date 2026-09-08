@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "录入持仓",
+  "usingComponents": {
+    "status-banner": "/components/status-banner/index"
+  }
+}

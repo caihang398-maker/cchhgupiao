@@ -1,0 +1,19 @@
+.chart-wrap {
+  width: 100%;
+  height: 520rpx;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.chart {
+  width: 100%;
+  height: 520rpx;
+}
+
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 520rpx;
+  color: #6b7280;
+}

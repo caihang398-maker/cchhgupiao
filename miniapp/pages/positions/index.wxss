@@ -1,0 +1,116 @@
+.page-head,
+.position-head,
+.position-actions,
+.plan-ranges {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.add-button {
+  width: 126rpx;
+  min-height: 72rpx;
+  margin: 0;
+  color: #1d4ed8;
+  background: #ffffff;
+  border: 1rpx solid #93c5fd;
+  border-radius: 9rpx;
+  font-size: 26rpx;
+  line-height: 72rpx;
+}
+
+.empty-action {
+  margin-top: 28rpx;
+}
+
+.position-item {
+  padding: 24rpx;
+  margin-bottom: 18rpx;
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 12rpx;
+}
+
+.position-name {
+  margin-right: 14rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.position-symbol {
+  color: #6b7280;
+  font-size: 23rpx;
+}
+
+.arrow {
+  color: #1d4ed8;
+  font-size: 40rpx;
+}
+
+.position-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rpx;
+  margin-top: 22rpx;
+  padding: 20rpx 0;
+  border-top: 1rpx solid #f0f2f5;
+  border-bottom: 1rpx solid #f0f2f5;
+}
+
+.position-grid text,
+.position-grid .strong {
+  display: block;
+}
+
+.position-grid text {
+  color: #6b7280;
+  font-size: 23rpx;
+}
+
+.position-grid .strong {
+  margin-top: 6rpx;
+}
+
+.plan-block {
+  margin-top: 18rpx;
+}
+
+.plan-summary {
+  color: #374151;
+  line-height: 1.55;
+}
+
+.plan-ranges {
+  margin-top: 12rpx;
+  color: #6b7280;
+  font-size: 24rpx;
+}
+
+.position-actions {
+  margin-top: 20rpx;
+}
+
+.text-button,
+.generate-button {
+  min-height: 72rpx;
+  margin: 0;
+  border-radius: 9rpx;
+  font-size: 25rpx;
+  line-height: 72rpx;
+}
+
+.text-button {
+  width: 120rpx;
+  background: #ffffff;
+}
+
+.danger-text {
+  color: #b91c1c;
+}
+
+.generate-button {
+  width: 280rpx;
+  color: #ffffff;
+  background: #1d4ed8;
+}

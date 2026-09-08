@@ -1,0 +1,64 @@
+<view class="page">
+  <view class="home-head">
+    <view>
+      <view class="page-title">今日决策</view>
+      <view class="page-subtitle">数据日期 {{dataDate}}</view>
+    </view>
+    <view class="sentiment-pill">{{sentimentText}}</view>
+  </view>
+
+  <status-banner level="{{freshness.level}}" message="{{freshness.message}}" />
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+
+  <view wx:if="{{loading}}" class="loading">正在读取最新决策数据...</view>
+  <block wx:else>
+    <view class="section metrics summary-metrics">
+      <view class="metric"><view class="metric-label">推荐总数</view><view class="metric-value">{{summary.total || 0}}</view></view>
+      <view class="metric"><view class="metric-label">重点</view><view class="metric-value">{{summary.priority || 0}}</view></view>
+      <view class="metric"><view class="metric-label">短 / 中 / 长</view><view class="metric-value compact-value">{{summary.short || 0}} / {{summary.mid || 0}} / {{summary.long || 0}}</view></view>
+      <view class="metric metric-link" bindtap="openReview"><view class="metric-label">推荐复盘</view><view class="metric-value compact-value">查看 ›</view></view>
+    </view>
+
+    <view class="section" wx:if="{{actions.length}}">
+      <view class="section-heading"><text class="section-title">今日行动清单</text><text class="caption">{{actions.length}}项</text></view>
+      <view
+        wx:for="{{actions}}"
+        wx:key="id"
+        class="action-item action-{{item.level}}"
+        data-target="{{item.target}}"
+        bindtap="openAction"
+      >
+        <view class="action-copy">
+          <view class="action-title">{{item.title}}</view>
+          <view class="action-detail">{{item.detail}}</view>
+        </view>
+        <text wx:if="{{item.target !== 'home'}}" class="action-arrow">›</text>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-heading">
+        <text class="section-title">市场概览</text>
+        <text class="section-action" bindtap="openMarket">查看市场地图 ›</text>
+      </view>
+      <view class="metrics">
+        <view wx:for="{{marketMetrics}}" wx:key="label" class="metric">
+          <view class="metric-label">{{item.label}}</view>
+          <view class="metric-value compact-value">{{item.value}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-heading"><text class="section-title">推荐股票</text></view>
+      <view class="segments">
+        <view class="segment {{selectedHorizon === 'all' ? 'active' : ''}}" data-horizon="all" bindtap="selectHorizon">全部</view>
+        <view class="segment {{selectedHorizon === 'short' ? 'active' : ''}}" data-horizon="short" bindtap="selectHorizon">短期</view>
+        <view class="segment {{selectedHorizon === 'mid' ? 'active' : ''}}" data-horizon="mid" bindtap="selectHorizon">中期</view>
+        <view class="segment {{selectedHorizon === 'long' ? 'active' : ''}}" data-horizon="long" bindtap="selectHorizon">长期</view>
+      </view>
+      <stock-card wx:for="{{visibleRecommendations}}" wx:key="id" item="{{item}}" bindselect="openStock" />
+      <view wx:if="{{!visibleRecommendations.length}}" class="empty">当前周期暂无推荐，请先在 PC 端刷新生成。</view>
+    </view>
+  </block>
+</view>

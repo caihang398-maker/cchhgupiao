@@ -1,0 +1,72 @@
+<view class="page">
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <view wx:if="{{loading}}" class="loading">正在读取K线和风险位...</view>
+  <block wx:elif="{{detail}}">
+    <view class="stock-header">
+      <view>
+        <view class="stock-name">{{detail.name}}</view>
+        <view class="stock-symbol">{{detail.symbol}} · {{detail.report.rating}}</view>
+      </view>
+      <view class="stock-score">{{detail.report.score}}<text>分</text></view>
+    </view>
+
+    <status-banner wx:if="{{detail.source_warning}}" level="warning" message="{{detail.source_warning}}" />
+
+    <view class="section panel chart-panel">
+      <view class="section-heading">
+        <text class="section-title">日K趋势</text>
+        <view class="periods">
+          <text class="period {{selectedDays === 60 ? 'active' : ''}}" data-days="60" bindtap="selectDays">60日</text>
+          <text class="period {{selectedDays === 120 ? 'active' : ''}}" data-days="120" bindtap="selectDays">120日</text>
+          <text class="period {{selectedDays === 240 ? 'active' : ''}}" data-days="240" bindtap="selectDays">240日</text>
+        </view>
+      </view>
+      <kline-chart bars="{{detail.kline}}" />
+    </view>
+
+    <view class="section metrics">
+      <view wx:for="{{reportMetrics}}" wx:key="label" class="metric">
+        <view class="metric-label">{{item.label}}</view>
+        <view class="metric-value detail-value {{item.risk ? 'down' : ''}}">{{item.value}}</view>
+      </view>
+    </view>
+
+    <view class="section panel">
+      <view class="section-title">操作条件</view>
+      <view class="summary-text">{{detail.report.action}}</view>
+      <view class="detail-list">
+        <view wx:for="{{detail.report.reasons}}" wx:key="*this" class="detail-line"><text class="dot dot-blue"></text><text>{{item}}</text></view>
+      </view>
+    </view>
+
+    <view class="section panel" wx:if="{{detail.recommendation}}">
+      <view class="row">
+        <view class="section-title">推荐可信度</view>
+        <view class="credibility-label">{{detail.recommendation.credibility.label}} {{detail.recommendation.credibility.score}}分</view>
+      </view>
+      <view class="mini-metrics">
+        <view wx:for="{{credibilityMetrics}}" wx:key="label">
+          <text>{{item.label}}</text><text class="strong">{{item.value}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="section panel">
+      <view class="section-title">投研解释</view>
+      <view wx:for="{{researchSections}}" wx:key="label" class="research-block"><text>{{item.label}}</text><view>{{item.value}}</view></view>
+      <view class="research-block"><text>失效条件</text><view>{{sellTriggersText}}</view></view>
+    </view>
+
+    <view class="section panel risk-panel">
+      <view class="section-title">风险提示</view>
+      <view wx:for="{{detail.report.warnings}}" wx:key="*this" class="detail-line"><text class="dot dot-red"></text><text>{{item}}</text></view>
+      <view class="caption">概率分析不等于结果保证，买点、止损和仓位必须一起执行。</view>
+    </view>
+
+    <view class="fixed-action-space"></view>
+    <view class="fixed-action action-grid">
+      <button class="secondary-button" bindtap="addAlert">设预警</button>
+      <button class="primary-button" bindtap="addPosition">加入持仓</button>
+    </view>
+  </block>
+</view>

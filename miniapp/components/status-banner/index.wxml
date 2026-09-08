@@ -1,0 +1,4 @@
+<view wx:if="{{message}}" class="banner banner-{{level}}">
+  <icon class="banner-icon" type="{{level === 'fresh' || level === 'success' ? 'success' : level === 'stale' || level === 'error' ? 'warn' : 'info'}}" size="18" />
+  <text class="banner-text">{{message}}</text>
+</view>

@@ -1,0 +1,77 @@
+.filter-panel {
+  margin-bottom: 22rpx;
+}
+
+.condition-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+  margin: 14rpx 0 26rpx;
+}
+
+.condition-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8rpx;
+  min-width: 0;
+  padding: 14rpx;
+  background: #f9fafb;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.45;
+}
+
+.condition-item checkbox {
+  flex: 0 0 auto;
+  transform: scale(0.82);
+}
+
+.slider-field {
+  margin-bottom: 20rpx;
+}
+
+.slider-field .field-label {
+  margin-bottom: 0;
+}
+
+.slider-value {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.price-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14rpx;
+}
+
+.price-input {
+  min-width: 0;
+  text-align: center;
+}
+
+.price-separator {
+  color: #6b7280;
+  font-size: 24rpx;
+}
+
+.random-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 22rpx;
+  padding: 16rpx 18rpx;
+  background: #f9fafb;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 8rpx;
+}
+
+.random-label {
+  margin-bottom: 2rpx;
+}
+
+.result-heading {
+  margin-top: 28rpx;
+}

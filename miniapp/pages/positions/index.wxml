@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="page-head">
+    <view>
+      <view class="page-title">持仓中心</view>
+      <view class="page-subtitle">保存成本与数量，生成做T、止损和回本观察路径。</view>
+    </view>
+    <button class="add-button" bindtap="addPosition">新增</button>
+  </view>
+
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+  <view wx:if="{{loading}}" class="loading">正在读取持仓...</view>
+  <view wx:elif="{{!items.length}}" class="empty panel">
+    还没有持仓记录。
+    <button class="primary-button empty-action" bindtap="addPosition">录入第一只持仓</button>
+  </view>
+  <block wx:else>
+    <view wx:for="{{items}}" wx:key="id" class="position-item">
+      <view class="position-head" data-symbol="{{item.symbol}}" bindtap="openStock">
+        <view>
+          <text class="position-name">{{item.name}}</text>
+          <text class="position-symbol">{{item.symbol}}</text>
+        </view>
+        <text class="arrow">›</text>
+      </view>
+      <view class="position-grid">
+        <view><text>持仓成本</text><text class="strong">{{item.cost_text}}</text></view>
+        <view><text>持股数量</text><text class="strong">{{item.shares}}股</text></view>
+        <view><text>当前参考价</text><text class="strong">{{item.current_text}}</text></view>
+        <view><text>做T比例</text><text class="strong">{{item.t_ratio_text}}</text></view>
+      </view>
+      <view class="plan-block">
+        <view class="plan-summary">{{item.plan_text}}</view>
+        <view class="plan-ranges"><text>低吸 {{item.buy_text}}</text><text>高抛 {{item.sell_text}}</text></view>
+      </view>
+      <view class="position-actions">
+        <button class="text-button danger-text" data-id="{{item.id}}" bindtap="removePosition">移出</button>
+        <button class="generate-button" loading="{{generatingId === item.id}}" data-id="{{item.id}}" bindtap="generatePlan">生成今日方案</button>
+      </view>
+    </view>
+  </block>
+</view>

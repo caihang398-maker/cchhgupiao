@@ -1,0 +1,145 @@
+.stock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8rpx 0 24rpx;
+}
+
+.stock-name {
+  font-size: 44rpx;
+  font-weight: 700;
+}
+
+.stock-symbol {
+  margin-top: 8rpx;
+  color: #6b7280;
+}
+
+.stock-score {
+  color: #b91c1c;
+  font-size: 50rpx;
+  font-weight: 700;
+}
+
+.stock-score text {
+  margin-left: 4rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+}
+
+.chart-panel {
+  overflow: hidden;
+}
+
+.periods {
+  display: flex;
+  gap: 8rpx;
+}
+
+.period {
+  padding: 7rpx 12rpx;
+  color: #6b7280;
+  border-radius: 6rpx;
+  font-size: 22rpx;
+}
+
+.period.active {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.detail-value {
+  font-size: 28rpx;
+}
+
+.summary-text {
+  margin-top: 16rpx;
+  color: #1d4ed8;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.detail-list {
+  margin-top: 18rpx;
+}
+
+.detail-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  margin-top: 12rpx;
+  color: #4b5563;
+  line-height: 1.55;
+}
+
+.dot {
+  flex: none;
+  width: 9rpx;
+  height: 9rpx;
+  margin-top: 17rpx;
+  border-radius: 50%;
+}
+
+.dot-blue {
+  background: #2563eb;
+}
+
+.dot-red {
+  background: #dc2626;
+}
+
+.credibility-label {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.mini-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.mini-metrics view {
+  min-width: 0;
+}
+
+.mini-metrics text,
+.mini-metrics .strong {
+  display: block;
+}
+
+.mini-metrics text {
+  color: #6b7280;
+  font-size: 22rpx;
+}
+
+.mini-metrics .strong {
+  margin-top: 6rpx;
+  overflow-wrap: anywhere;
+}
+
+.research-block {
+  margin-top: 20rpx;
+  line-height: 1.6;
+}
+
+.research-block text {
+  color: #374151;
+  font-weight: 600;
+}
+
+.research-block view {
+  margin-top: 6rpx;
+  color: #6b7280;
+}
+
+.risk-panel {
+  border-color: #fecaca;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 14rpx;
+}

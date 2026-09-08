@@ -1,0 +1,108 @@
+.stock-card {
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 12rpx;
+}
+
+.stock-head,
+.stock-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.stock-name-wrap {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 14rpx;
+}
+
+.stock-name {
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.stock-symbol,
+.label {
+  color: #6b7280;
+  font-size: 23rpx;
+}
+
+.score-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 6rpx;
+  color: #b91c1c;
+}
+
+.score {
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.score-label {
+  font-size: 21rpx;
+}
+
+.stock-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin: 16rpx 0 20rpx;
+}
+
+.stock-tag {
+  padding: 5rpx 12rpx;
+  color: #374151;
+  background: #f3f4f6;
+  border-radius: 6rpx;
+  font-size: 22rpx;
+}
+
+.stock-tag-blue {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.stock-tag-red {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.stock-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.stock-grid view {
+  min-width: 0;
+}
+
+.label,
+.value {
+  display: block;
+}
+
+.value {
+  margin-top: 6rpx;
+  font-weight: 600;
+}
+
+.stock-action {
+  margin-top: 20rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid #f0f2f5;
+  color: #4b5563;
+  font-size: 25rpx;
+}
+
+.arrow {
+  color: #1d4ed8;
+  font-size: 40rpx;
+  line-height: 1;
+}

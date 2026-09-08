@@ -123,6 +123,53 @@ MYSQL_REQUIRED_COLUMNS: dict[str, set[str]] = {
         "last_activity_at",
     },
 }
+PAYMENT_MYSQL_REQUIRED_COLUMNS: dict[str, set[str]] = {
+    "payment_provider_products": {
+        "id",
+        "plan_id",
+        "provider",
+        "environment",
+        "external_product_id",
+        "provider_price_minor",
+        "provider_currency",
+        "status",
+    },
+    "payment_checkout_sessions": {
+        "id",
+        "order_id",
+        "provider",
+        "environment",
+        "request_id",
+        "checkout_id",
+        "checkout_url",
+        "provider_subscription_id",
+        "status",
+    },
+    "payment_subscriptions": {
+        "id",
+        "provider",
+        "environment",
+        "provider_subscription_id",
+        "user_id",
+        "plan_id",
+        "initial_order_id",
+        "status",
+        "current_period_start_at",
+        "current_period_end_at",
+    },
+    "payment_webhook_events": {
+        "id",
+        "provider",
+        "environment",
+        "event_id",
+        "event_type",
+        "payload_sha256",
+        "payload_json",
+        "process_status",
+        "attempts",
+        "received_at",
+    },
+}
 MYSQL_REQUIRED_VIEWS = {"v_user_account_status"}
 
 
@@ -169,6 +216,7 @@ def mysql_schema_findings(
     table_names: Iterable[str],
     view_names: Iterable[str],
     columns_by_table: Mapping[str, Iterable[str]],
+    include_payment: bool = False,
 ) -> list[str]:
     tables = {str(item).lower() for item in table_names}
     views = {str(item).lower() for item in view_names}
@@ -178,7 +226,11 @@ def mysql_schema_findings(
     }
     findings: list[str] = []
 
-    missing_tables = sorted(set(MYSQL_REQUIRED_COLUMNS) - tables)
+    required_columns = dict(MYSQL_REQUIRED_COLUMNS)
+    if include_payment:
+        required_columns.update(PAYMENT_MYSQL_REQUIRED_COLUMNS)
+
+    missing_tables = sorted(set(required_columns) - tables)
     if missing_tables:
         findings.append("MySQL缺少数据表：" + "、".join(missing_tables))
 
@@ -186,10 +238,10 @@ def mysql_schema_findings(
     if missing_views:
         findings.append("MySQL缺少视图：" + "、".join(missing_views))
 
-    for table, required_columns in MYSQL_REQUIRED_COLUMNS.items():
+    for table, table_required_columns in required_columns.items():
         if table not in tables:
             continue
-        missing_columns = sorted(required_columns - normalized_columns.get(table, set()))
+        missing_columns = sorted(table_required_columns - normalized_columns.get(table, set()))
         if missing_columns:
             findings.append(f"MySQL表 {table} 缺少字段：" + "、".join(missing_columns))
     return findings

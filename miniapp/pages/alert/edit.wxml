@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="page-title">新增预警</view>
+  <view class="page-subtitle">市场类预警可以不填写股票，个股类预警必须填写代码。</view>
+  <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
+
+  <view class="panel form-panel">
+    <view class="field">
+      <text class="field-label">预警类型</text>
+      <picker range="{{types}}" value="{{typeIndex}}" bindchange="selectType">
+        <view class="field-picker"><text>{{types[typeIndex]}}</text><text>⌄</text></view>
+      </picker>
+    </view>
+    <view class="field">
+      <text class="field-label">股票名称或代码</text>
+      <input class="field-input" data-field="symbol" value="{{form.symbol}}" bindinput="handleInput" placeholder="市场类预警可留空" />
+    </view>
+    <view class="field">
+      <text class="field-label">自定义阈值</text>
+      <input class="field-input" type="digit" data-field="threshold_value" value="{{form.threshold_value}}" bindinput="handleInput" placeholder="可选" />
+    </view>
+    <view class="field">
+      <text class="field-label">备注</text>
+      <textarea class="field-textarea" data-field="note" value="{{form.note}}" bindinput="handleInput" placeholder="例如：跌破止损及时处理" />
+    </view>
+    <button class="primary-button" loading="{{saving}}" bindtap="save">保存预警规则</button>
+  </view>
+</view>
