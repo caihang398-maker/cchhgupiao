@@ -46,7 +46,7 @@ OpenID，不依赖 PC 端 MySQL。准备售卖会员时应关闭个人模式，�
 4. 构建上下文选择仓库根目录，Dockerfile 路径填写：
 
 ```text
-deploy/cloudbase/Dockerfile
+Dockerfile
 ```
 
 5. 服务端口填写 `80`，健康检查路径填写 `/health`。
@@ -89,6 +89,16 @@ Dockerfile 已提供 `PORT=80`、临时目录和监听地址。云托管模式�
 完成小程序调用测试后，在云托管控制台关闭服务公网访问，只保留微信云调用。这样外部请求无法
 自行伪造 `X-WX-OPENID`。如因调试暂时开启公网访问，不得同时把生产会员数据和支付能力开放出去。
 
+CloudBase CLI 当前每次源码部署都会重新开启 `PUBLIC`、`OA` 和 `MINIAPP` 三种入口。仓库中的部署
+脚本会在健康检查通过后自动把入口收敛为 `MINIAPP`，因此正式环境不要绕过脚本直接发布：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\deploy_cloudbase.ps1
+```
+
+脚本只从当前 Git 提交打包 `Dockerfile`、小程序后端依赖、`stock_quant` 和脱敏种子，不会上传
+`.venv`、历史发布包、本地数据库、日志或会员资料。现有云端密钥会被保留，不会写入本机文件或 Git。
+
 ## 五、切换小程序请求方式
 
 编辑 `miniapp/cloud.config.js`，只在准备测试的环境填入云环境 ID。例如先切开发版：
@@ -120,6 +130,19 @@ develop: {
 - 重启实例和重新部署后，PostgreSQL 快照中的个人数据仍存在。
 - 关闭公网入口后，小程序仍能通过 `callContainer` 正常访问。
 - 云端异常时把对应环境的 `enabled` 改为 `false`，现有接口可立即接管。
+
+## 当前体验环境
+
+- 环境 ID：`a125378155-d6gsz6qfn63b5b12b`
+- 服务：`gupiaoxiaochengxu`
+- 容器版本：`gupiaoxiaochengxu-002`
+- 资源：`0.25 CPU / 0.5 GB`，最小实例 `0`，最大实例 `1`
+- 入口：仅 `MINIAPP`；容器访问外部行情数据的出口保持启用
+- 小程序版本：`2.0.0` 已上传为开发版本
+
+当前未配置 `MINIAPP_CLOUD_DATABASE_URL`，行情、推荐和 K 线可正常试用，但持仓、预警和模拟交易的
+新增数据只保存在当前容器实例中，缩容或重新部署后可能丢失。正式依赖这些写入功能前，必须完成
+CloudBase PostgreSQL 连接和重启持久化测试。
 
 ## 官方参考
 

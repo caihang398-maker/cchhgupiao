@@ -46,6 +46,13 @@ powershell -ExecutionPolicy Bypass -File scripts\start_miniapp_local.ps1
 [`docs/cloudbase_miniapp_deployment.md`](docs/cloudbase_miniapp_deployment.md)。该方案不会替换 PC 端
 `8501` 服务；未启用云环境时，小程序继续使用现有接口。
 
+已授权 CloudBase CLI 的电脑可使用专用脚本发布小程序后端。脚本会缩小上传包、执行健康检查，并在
+发布后自动关闭普通公网入口，只保留微信小程序云调用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\deploy_cloudbase.ps1
+```
+
 ## 从 GitHub 安装
 
 ```powershell

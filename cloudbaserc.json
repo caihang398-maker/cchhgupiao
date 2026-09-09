@@ -1,0 +1,8 @@
+{
+  "version": "2.0",
+  "envId": "a125378155-d6gsz6qfn63b5b12b",
+  "$schema": "https://framework-1258016615.tcloudbaseapp.com/schema/latest.json",
+  "cloudrun": {
+    "name": "gupiaoxiaochengxu"
+  }
+}
