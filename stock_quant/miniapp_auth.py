@@ -174,6 +174,22 @@ def login_with_account(identifier: str, password: str, ip_address: str | None = 
 def user_from_access_token(token: str) -> dict[str, Any]:
     claims = verify_token(token, ACCESS_PURPOSE)
     user_id = int(claims.get("sub") or 0)
+    if claims.get("identity_type") == "cloudbase_personal":
+        if not cloudbase_personal_mode_enabled():
+            raise MiniappTokenError("云托管个人登录模式已关闭")
+        return {
+            "id": user_id,
+            "login_name": f"wx_{user_id}",
+            "mobile": "",
+            "real_name": "微信用户",
+            "roles": ["ADMIN"],
+            "is_admin": True,
+            "service_status": "active",
+            "service_valid": True,
+            "service_started_at": None,
+            "service_expires_at": None,
+            "identity_type": "cloudbase_personal",
+        }
     if user_id == 0:
         if not local_dev_enabled():
             raise MiniappTokenError("本机调试登录已关闭")
@@ -204,6 +220,38 @@ def owner_key_for_user(user: dict[str, Any]) -> str:
 
 def cloudbase_identity_enabled() -> bool:
     return _truthy("MINIAPP_TRUST_CLOUDBASE_IDENTITY", "false")
+
+
+def cloudbase_personal_mode_enabled() -> bool:
+    """Use CloudBase's verified WeChat identity without the PC membership database.
+
+    This mode is intentionally limited to a personal mini program deployment.  The
+    CloudBase gateway supplies the OpenID headers; callers cannot opt into it by
+    posting an arbitrary OpenID to the public API.
+    """
+
+    return cloudbase_identity_enabled() and _truthy(
+        "MINIAPP_CLOUDBASE_PERSONAL_MODE",
+        "false",
+    )
+
+
+def _cloudbase_personal_user(app_id: str, open_id: str) -> dict[str, Any]:
+    digest = hashlib.sha256(f"{app_id}:{open_id}".encode("utf-8")).digest()
+    user_id = int.from_bytes(digest[:8], "big") % 2_000_000_000 + 1
+    return {
+        "id": user_id,
+        "login_name": f"wx_{hashlib.sha256(open_id.encode('utf-8')).hexdigest()[:12]}",
+        "mobile": "",
+        "real_name": "微信用户",
+        "roles": ["ADMIN"],
+        "is_admin": True,
+        "service_status": "active",
+        "service_valid": True,
+        "service_started_at": None,
+        "service_expires_at": None,
+        "identity_type": "cloudbase_personal",
+    }
 
 
 def wechat_configured() -> bool:
@@ -435,6 +483,23 @@ def login_with_cloudbase_wechat(
     if not secrets.compare_digest(configured_app_id, supplied_app_id):
         raise MiniappAuthError("云托管微信 AppID 与当前小程序不一致")
 
+    if cloudbase_personal_mode_enabled():
+        user = _cloudbase_personal_user(supplied_app_id, supplied_open_id)
+        ttl_days = max(1, min(30, int(os.getenv("MINIAPP_TOKEN_DAYS", "7"))))
+        token_payload = {
+            "token": issue_token(
+                {
+                    "sub": int(user["id"]),
+                    "identity_type": "cloudbase_personal",
+                },
+                ACCESS_PURPOSE,
+                ttl_days * 86400,
+            ),
+            "expires_in": ttl_days * 86400,
+            "user": public_user(user),
+        }
+        return {"status": "authenticated", **token_payload}
+
     return login_with_wechat_identity(
         {
             "app_id": supplied_app_id,
@@ -504,7 +569,8 @@ def bind_wechat_account(
 def validate_api_startup(host: str) -> None:
     _token_secret()
     production = os.getenv("APP_ENV", "local").strip().lower() in {"production", "prod"}
-    if production and not auth_enabled():
+    personal_cloudbase = cloudbase_personal_mode_enabled()
+    if production and not auth_enabled() and not personal_cloudbase:
         raise MiniappConfigurationError("正式环境必须设置 AUTH_ENABLED=true")
     if cloudbase_identity_enabled() and not os.getenv("WECHAT_MINIAPP_APP_ID", "").strip():
         raise MiniappConfigurationError("云托管身份模式必须设置 WECHAT_MINIAPP_APP_ID")
@@ -513,7 +579,11 @@ def validate_api_startup(host: str) -> None:
             raise MiniappConfigurationError(f"云端持久化目录尚未挂载：{DATA_DIR}")
         if not os.access(DATA_DIR, os.W_OK):
             raise MiniappConfigurationError(f"云端持久化目录不可写：{DATA_DIR}")
-    if not auth_enabled() and host not in {"127.0.0.1", "localhost", "::1"}:
+    if (
+        not auth_enabled()
+        and not personal_cloudbase
+        and host not in {"127.0.0.1", "localhost", "::1"}
+    ):
         raise MiniappConfigurationError("免登录调试模式只能绑定本机地址")
 
 

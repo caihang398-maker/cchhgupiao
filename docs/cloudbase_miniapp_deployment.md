@@ -6,8 +6,8 @@
 
 - PC 端继续由 `app.py` 在 `8501` 端口运行。
 - Windows 服务器、计划任务、发布脚本和原数据库路径保持原样。
-- 小程序 API 作为独立容器部署到微信云托管，服务名固定为
-  `stock-quant-miniapp-api`。
+- 小程序 API 作为独立容器部署到微信云托管，当前环境服务名为
+  `gupiaoxiaochengxu`。
 - 小程序可在“现有 HTTP 接口”和“微信云托管”之间切换；云端异常时关闭开关即可回退。
 
 ## 为什么采用云托管
@@ -22,34 +22,27 @@
 
 ## 数据持久化
 
-云托管容器本地磁盘不是持久存储。必须在首次上线前创建 CFS 文件存储，并挂载到：
+云托管容器本地磁盘不是持久存储。本项目在云端继续使用经过验证的 SQLite 业务层，但会在容器启动
+时从 CloudBase PostgreSQL 恢复完整快照，并在持仓、预警和模拟交易等写操作后同步回 PostgreSQL。
+这样既不改动 PC 端存储，也无需额外购买 CFS。
 
-```text
-/mnt/stock-quant-data
-```
+仓库中的 `deploy/cloudbase/stock_recommendations.seed.gz` 只包含公开行情、推荐和复盘数据；构建脚本会
+清空持仓、预警、模拟交易、交易账本和个人查询记录。首次启动或数据库暂不可用时用该种子提供只读
+行情。个人数据永远不提交 Git。
 
-容器通过 `STOCK_QUANT_DATA_DIR` 把 SQLite、缓存放到该目录。未挂载 CFS 时虽然服务能够启动，
-但扩缩容或重新部署后数据可能丢失，因此不得作为正式环境使用。镜像已开启
-`MINIAPP_REQUIRE_PERSISTENT_STORAGE=true`，没有检测到挂载点或目录不可写时会主动拒绝启动，避免
-误把临时盘当成正式数据库。
+SQLite 云端使用 `delete` 回滚日志模式，PC 端仍保持 WAL。当前快照同步方案要求云托管最大实例数为
+1；最小实例数可设为 0，以便体验阶段按需启动并节省资源。将来需要多人高并发时，再把各业务表原生
+迁移到 PostgreSQL 后开放多实例。
 
-SQLite 的 WAL 模式不适合网络文件系统。云容器已单独使用 `delete` 回滚日志模式，PC 端仍保持
-原来的 WAL 模式。云托管服务必须把最小实例和最大实例都设为 1，不能让多个容器同时写同一个
-SQLite 文件。这是个人使用和少量测试用户阶段的过渡方案；需要扩容前应把云端持仓、预警、模拟
-交易和推荐数据迁移到 MySQL，再开放多实例。
-
-会员账号仍使用现有 MySQL。MySQL 必须允许云托管所在网络访问，并限制来源、使用专用低权限账号。
-不应把数据库密码写入 Git、小程序代码或 Dockerfile。
-
-推荐数据的每日刷新是独立任务：第一阶段继续保留现有 PC/Windows 扫描任务；迁移云端刷新任务前，
-需要把最新 SQLite 安全同步到 CFS。第二阶段再建立云端定时扫描作业，且同一时刻只允许一个写入者，
-避免 SQLite 并发写入冲突。
+个人版可开启 `MINIAPP_CLOUDBASE_PERSONAL_MODE=true`，直接使用 CloudBase 网关注入并校验过的微信
+OpenID，不依赖 PC 端 MySQL。准备售卖会员时应关闭个人模式，改用正式会员数据库、独立角色权限和
+订阅校验。
 
 ## 一、创建云环境
 
 1. 在微信开发者工具打开 AppID `wx7ded5b1d303e1b1d` 对应的小程序。
 2. 点击“云开发”，创建与该小程序绑定的云环境，记录环境 ID。
-3. 开通云托管，创建服务 `stock-quant-miniapp-api`。
+3. 开通云托管，创建或更新服务 `gupiaoxiaochengxu`。
 4. 构建上下文选择仓库根目录，Dockerfile 路径填写：
 
 ```text
@@ -58,20 +51,19 @@ deploy/cloudbase/Dockerfile
 
 5. 服务端口填写 `80`，健康检查路径填写 `/health`。
 
-当前 SQLite 过渡方案必须固定为 1 个实例，不允许自动扩容到多个实例。为了避免冷启动和重复写入，
-建议最小实例与最大实例都设置为 1。
+体验阶段设置最小实例数为 0、最大实例数为 1；正式提供稳定服务后可把最小实例数调整为 1。
 
-## 二、挂载 CFS
+## 二、初始化 CloudBase PostgreSQL
 
-在云托管服务的“文件存储/存储挂载”中创建或选择 CFS，并把挂载路径设置为：
+在 CloudBase PostgreSQL 中创建一个仅供该云托管服务使用的数据库账号，并取得内网连接串。账号只需
+对自己的 schema 拥有建表和读写权限。连接串作为云托管加密环境变量保存：
 
 ```text
-/mnt/stock-quant-data
+MINIAPP_CLOUD_DATABASE_URL=postgresql://用户:密码@内网地址:端口/数据库?sslmode=require
 ```
 
-首次切流量前确认容器对该目录具有读写权限，并完成当前
-`data/stock_recommendations.sqlite3` 的初始化或同步。数据库文件、`-wal` 和 `-shm` 文件必须位于
-同一挂载目录。
+不要把连接串写入 Git、Dockerfile、小程序源码或聊天记录。服务首次启动会自动创建
+`stock_quant_miniapp_state` 表并写入脱敏种子。
 
 ## 三、配置云托管环境变量
 
@@ -79,20 +71,16 @@ deploy/cloudbase/Dockerfile
 
 ```text
 APP_ENV=production
-AUTH_ENABLED=true
+AUTH_ENABLED=false
 MINIAPP_TOKEN_SECRET=至少32位高强度随机字符串
-MINIAPP_WECHAT_AUTO_REGISTER=true
-MINIAPP_WECHAT_TRIAL_DAYS=7
 MINIAPP_TRUST_CLOUDBASE_IDENTITY=true
+MINIAPP_CLOUDBASE_PERSONAL_MODE=true
+MINIAPP_CLOUD_SQLITE_SYNC=true
+MINIAPP_CLOUD_DATABASE_URL=CloudBase PostgreSQL内网连接串
 WECHAT_MINIAPP_APP_ID=wx7ded5b1d303e1b1d
-DB_HOST=你的MySQL地址
-DB_PORT=3306
-DB_NAME=stock_quant_saas
-DB_USER=小程序专用数据库账号
-DB_PASSWORD=数据库强密码
 ```
 
-Dockerfile 已提供 `PORT=80`、持久化目录和监听地址。云托管模式通过可信身份头获得 OpenID，
+Dockerfile 已提供 `PORT=80`、临时目录和监听地址。云托管模式通过可信身份头获得 OpenID，
 不需要配置 `WECHAT_MINIAPP_APP_SECRET`。如仍保留现有服务器的 `wx.login` 换码模式，AppSecret 只放在
 现有服务器环境变量中。
 
@@ -109,7 +97,7 @@ Dockerfile 已提供 `PORT=80`、持久化目录和监听地址。云托管模�
 develop: {
   enabled: true,
   envId: '你的云环境ID',
-  service: 'stock-quant-miniapp-api'
+  service: 'gupiaoxiaochengxu'
 }
 ```
 
@@ -126,10 +114,10 @@ develop: {
 - PC 端 `http://127.0.0.1:8501` 可正常登录和使用。
 - 本地小程序 API `http://127.0.0.1:8512/health` 仍返回 200。
 - 云托管 `/health` 返回 200，且显示微信登录已配置。
-- 微信登录首次只创建一个会员，再次登录仍识别同一 OpenID。
+- 微信登录首次和再次均稳定识别同一 OpenID。
 - 不同微信用户无法看到彼此的持仓、预警和模拟交易。
 - 今日推荐日期、K 线日期和数据状态一致，不把历史缓存标成实时行情。
-- 重启实例、重新部署和扩缩容后，CFS 中的数据仍存在。
+- 重启实例和重新部署后，PostgreSQL 快照中的个人数据仍存在。
 - 关闭公网入口后，小程序仍能通过 `callContainer` 正常访问。
 - 云端异常时把对应环境的 `enabled` 改为 `false`，现有接口可立即接管。
 
@@ -138,4 +126,4 @@ develop: {
 - [小程序调用云托管](https://docs.cloudbase.net/run/develop/access/mini)
 - [已有应用迁移到云托管](https://docs.cloudbase.net/run/best-practice/migration)
 - [Python 应用容器化](https://docs.cloudbase.net/run/quick-start/dockerize-python)
-- [云托管挂载 CFS](https://docs.cloudbase.net/en/run/deploy/configuring/storage/cfs)
+- [连接 CloudBase PostgreSQL](https://docs.cloudbase.net/database/postgresql/connecting-to-postgresql)

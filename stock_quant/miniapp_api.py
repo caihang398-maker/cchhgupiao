@@ -13,6 +13,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .auth import auth_enabled
+from .cloud_state import cloud_sqlite_sync_enabled, prepare_cloud_state, sync_cloud_state
 from .logging_config import configure_application_logging
 from .miniapp_auth import (
     MiniappAuthError,
@@ -192,6 +193,7 @@ class MiniappApiHandler(BaseHTTPRequestHandler):
         self._dispatch("DELETE")
 
     def _dispatch(self, method: str) -> None:
+        should_sync = cloud_sqlite_sync_enabled() and method in {"POST", "PATCH", "DELETE"}
         try:
             parsed = urlparse(self.path)
             path = parsed.path.rstrip("/") or "/"
@@ -320,6 +322,12 @@ class MiniappApiHandler(BaseHTTPRequestHandler):
         except Exception:
             LOGGER.exception("小程序接口发生未处理异常：%s %s", method, self.path)
             self._error(HTTPStatus.INTERNAL_SERVER_ERROR, "internal_error", "服务暂时不可用，请稍后重试")
+        finally:
+            if should_sync:
+                try:
+                    sync_cloud_state()
+                except Exception:
+                    LOGGER.exception("小程序数据持久化同步失败")
 
     def _login(self) -> None:
         client_ip = self._client_ip()
@@ -423,6 +431,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     configure_application_logging()
+    prepare_cloud_state()
     validate_startup(args.host)
     server = MiniappApiServer((args.host, args.port), MiniappApiHandler)
     LOGGER.info("小程序 API 已启动：http://%s:%s", args.host, args.port)

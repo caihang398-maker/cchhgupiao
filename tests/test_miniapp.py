@@ -21,11 +21,13 @@ from stock_quant.miniapp_auth import (
     MiniappConfigurationError,
     MiniappEntitlementError,
     MiniappTokenError,
+    cloudbase_personal_mode_enabled,
     issue_token,
     login_with_account,
     login_with_cloudbase_wechat,
     login_with_wechat,
     require_active_service,
+    user_from_access_token,
     validate_api_startup,
     verify_token,
     wechat_configured,
@@ -158,6 +160,24 @@ class MiniappAuthTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(MiniappAuthError, "AppID"):
                 login_with_cloudbase_wechat("wx-other", "openid-test")
+
+    def test_cloudbase_personal_mode_uses_verified_identity_without_mysql(self) -> None:
+        environment = {
+            **TOKEN_ENV,
+            "APP_ENV": "production",
+            "AUTH_ENABLED": "false",
+            "MINIAPP_TRUST_CLOUDBASE_IDENTITY": "true",
+            "MINIAPP_CLOUDBASE_PERSONAL_MODE": "true",
+            "WECHAT_MINIAPP_APP_ID": "wx-test",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertTrue(cloudbase_personal_mode_enabled())
+            result = login_with_cloudbase_wechat("wx-test", "openid-test")
+            user = user_from_access_token(result["token"])
+            validate_api_startup("0.0.0.0")
+        self.assertEqual(result["status"], "authenticated")
+        self.assertTrue(user["is_admin"])
+        self.assertGreater(user["id"], 0)
 
     def test_cloudbase_mode_does_not_require_app_secret(self) -> None:
         with patch.dict(

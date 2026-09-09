@@ -3,17 +3,17 @@ module.exports = {
     develop: {
       enabled: true,
       envId: 'a125378155-d6gsz6qfn63b5b12b',
-      service: 'stock-quant-miniapp-api'
+      service: 'gupiaoxiaochengxu'
     },
     trial: {
       enabled: true,
       envId: 'a125378155-d6gsz6qfn63b5b12b',
-      service: 'stock-quant-miniapp-api'
+      service: 'gupiaoxiaochengxu'
     },
     release: {
       enabled: false,
       envId: '',
-      service: 'stock-quant-miniapp-api'
+      service: 'gupiaoxiaochengxu'
     }
   }
 }
