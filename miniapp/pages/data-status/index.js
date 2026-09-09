@@ -7,8 +7,8 @@ Page({
     error: '',
     ready: false,
     checkedText: '-',
-    recommendation: {},
-    market: {},
+    recommendation: { level: '', message: '' },
+    market: { level: '', message: '' },
     marketMetrics: [],
     items: []
   },

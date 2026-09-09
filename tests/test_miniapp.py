@@ -101,6 +101,22 @@ class MiniappAuthTests(unittest.TestCase):
             with self.assertRaisesRegex(MiniappEntitlementError, "已到期"):
                 require_active_service(expired)
 
+    def test_account_login_requires_member_database_in_cloud_personal_mode(self) -> None:
+        environment = {
+            **TOKEN_ENV,
+            "APP_ENV": "production",
+            "AUTH_ENABLED": "false",
+            "MINIAPP_TRUST_CLOUDBASE_IDENTITY": "true",
+            "MINIAPP_CLOUDBASE_PERSONAL_MODE": "true",
+            "WECHAT_MINIAPP_APP_ID": "wx-test",
+        }
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch("stock_quant.miniapp_auth.auth_enabled", return_value=False),
+        ):
+            with self.assertRaisesRegex(MiniappConfigurationError, "登录服务尚未启用"):
+                login_with_account("member", "password")
+
     def test_wechat_first_login_can_create_trial_user(self) -> None:
         created = {
             "id": 12,

@@ -7,7 +7,7 @@
     <view class="sentiment-pill">{{sentimentText}}</view>
   </view>
 
-  <status-banner level="{{freshness.level}}" message="{{freshness.message}}" />
+  <status-banner wx:if="{{freshness.message}}" level="{{freshness.level}}" message="{{freshness.message}}" />
   <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
 
   <view wx:if="{{loading}}" class="loading">正在读取最新决策数据...</view>

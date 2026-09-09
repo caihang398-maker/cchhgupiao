@@ -5,7 +5,7 @@ Page({
   data: {
     loading: true,
     error: '',
-    freshness: {},
+    freshness: { level: '', message: '' },
     metrics: [],
     sentiment: null,
     hotspots: [],

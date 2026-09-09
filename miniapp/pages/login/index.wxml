@@ -9,26 +9,28 @@
     <view class="panel-title">{{bindingWechat ? '绑定现有会员账号' : (automaticLogin ? '正在安全登录' : '登录系统')}}</view>
     <view class="panel-caption" wx:if="{{bindingWechat}}">验证一次账号，后续即可使用微信快捷登录。</view>
     <view class="panel-caption" wx:elif="{{automaticLogin}}">正在使用微信身份进入，无需输入微信号或密码。</view>
-    <view class="panel-caption" wx:else>优先使用微信快捷登录；已有 PC 会员也可使用账号登录。</view>
+    <view class="panel-caption" wx:else>{{accountLoginEnabled ? '优先使用微信快捷登录；已有 PC 会员也可使用账号登录。' : '当前为个人云开发版，使用微信身份即可安全进入。'}}</view>
     <view wx:if="{{automaticLogin}}" class="automatic-login-state">
       <view class="login-spinner"></view>
       <view class="automatic-login-text">正在验证登录状态...</view>
     </view>
     <block wx:else>
-      <view class="field">
-        <text class="field-label">手机号或登录名</text>
-        <input class="field-input" value="{{identifier}}" bindinput="handleIdentifier" placeholder="请输入账号" />
-      </view>
-      <view class="field">
-        <text class="field-label">密码</text>
-        <input class="field-input" value="{{password}}" bindinput="handlePassword" password placeholder="请输入密码" />
-      </view>
+      <block wx:if="{{accountLoginEnabled || bindingWechat}}">
+        <view class="field">
+          <text class="field-label">手机号或登录名</text>
+          <input class="field-input" value="{{identifier}}" bindinput="handleIdentifier" placeholder="请输入账号" />
+        </view>
+        <view class="field">
+          <text class="field-label">密码</text>
+          <input class="field-input" value="{{password}}" bindinput="handlePassword" password placeholder="请输入密码" />
+        </view>
+      </block>
       <view wx:if="{{error}}" class="error-message">{{error}}</view>
-      <button class="primary-button" loading="{{loading}}" bindtap="accountLogin">
+      <button wx:if="{{accountLoginEnabled || bindingWechat}}" class="primary-button" loading="{{loading}}" bindtap="accountLogin">
         {{bindingWechat ? '验证并绑定' : '账号登录'}}
       </button>
-      <view wx:if="{{!bindingWechat}}" class="login-separator"><text>或</text></view>
-      <button wx:if="{{!bindingWechat}}" class="wechat-button" disabled="{{loading}}" bindtap="wechatLogin">微信快捷登录</button>
+      <view wx:if="{{!bindingWechat && accountLoginEnabled && wechatLoginEnabled}}" class="login-separator"><text>或</text></view>
+      <button wx:if="{{!bindingWechat && wechatLoginEnabled}}" class="wechat-button" disabled="{{loading}}" bindtap="wechatLogin">微信快捷登录</button>
     </block>
   </view>
 

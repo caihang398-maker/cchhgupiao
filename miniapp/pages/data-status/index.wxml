@@ -7,8 +7,8 @@
   <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
   <view wx:if="{{loading}}" class="loading">正在检查本地数据和备用链路...</view>
   <block wx:else>
-    <status-banner level="{{recommendation.level}}" message="{{recommendation.message}}" />
-    <status-banner level="{{market.level}}" message="{{market.message}}" />
+    <status-banner wx:if="{{recommendation.message}}" level="{{recommendation.level}}" message="{{recommendation.message}}" />
+    <status-banner wx:if="{{market.message}}" level="{{market.level}}" message="{{market.message}}" />
 
     <view class="section metrics">
       <view wx:for="{{marketMetrics}}" wx:key="label" class="metric">

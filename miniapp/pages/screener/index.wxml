@@ -45,7 +45,7 @@
     <button class="primary-button" loading="{{loading}}" bindtap="runScreener">生成筛选结果</button>
   </view>
 
-  <status-banner level="{{freshness.level}}" message="{{freshness.message}}" />
+  <status-banner wx:if="{{freshness.message}}" level="{{freshness.level}}" message="{{freshness.message}}" />
   <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
 
   <view class="section-heading result-heading">

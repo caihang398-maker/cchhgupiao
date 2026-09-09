@@ -6,6 +6,8 @@ Page({
     password: '',
     bindToken: '',
     bindingWechat: false,
+    accountLoginEnabled: false,
+    wechatLoginEnabled: true,
     automaticLogin: true,
     loading: false,
     error: ''
@@ -18,7 +20,34 @@ Page({
         .catch((error) => this.setData({ automaticLogin: false, error: error.message }))
       return
     }
-    this.wechatLogin({ automatic: true })
+    this.prepareLogin()
+  },
+
+  prepareLogin() {
+    this.setData({ loading: true, automaticLogin: true, error: '' })
+    request({ url: '/health', auth: false })
+      .then((status) => {
+        const accountLoginEnabled = Boolean(status.auth_enabled)
+        const wechatLoginEnabled = Boolean(status.wechat_configured)
+        this.setData({
+          accountLoginEnabled,
+          wechatLoginEnabled,
+          loading: false
+        })
+        if (wechatLoginEnabled) {
+          this.wechatLogin({ automatic: true })
+          return
+        }
+        this.setData({
+          automaticLogin: false,
+          error: accountLoginEnabled ? '' : '服务器尚未配置可用的登录方式'
+        })
+      })
+      .catch((error) => this.setData({
+        loading: false,
+        automaticLogin: false,
+        error: error.message
+      }))
   },
 
   handleIdentifier(event) {
@@ -47,6 +76,10 @@ Page({
 
   accountLogin() {
     if (this.data.loading) return
+    if (!this.data.accountLoginEnabled && !this.data.bindingWechat) {
+      this.setData({ error: '当前个人版使用微信快捷登录，无需输入账号密码' })
+      return
+    }
     this.setData({ loading: true, error: '' })
     const binding = Boolean(this.data.bindToken)
     const url = binding ? '/auth/bind' : '/auth/login'
@@ -63,6 +96,10 @@ Page({
 
   wechatLogin(options = {}) {
     if (this.data.loading) return
+    if (!this.data.wechatLoginEnabled) {
+      this.setData({ error: '当前服务器尚未启用微信快捷登录' })
+      return
+    }
     this.setData({
       loading: true,
       automaticLogin: Boolean(options.automatic),

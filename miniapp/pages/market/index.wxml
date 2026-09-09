@@ -1,7 +1,7 @@
 <view class="page">
   <view class="page-title">市场地图</view>
   <view class="page-subtitle">先看市场温度与情绪阶段，再看行业和题材方向。</view>
-  <status-banner level="{{freshness.level}}" message="{{freshness.message}}" />
+  <status-banner wx:if="{{freshness.message}}" level="{{freshness.level}}" message="{{freshness.message}}" />
   <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
   <view wx:if="{{loading}}" class="loading">正在读取市场数据...</view>
   <block wx:else>

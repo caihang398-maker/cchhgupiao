@@ -22,7 +22,7 @@
     <view class="segment {{horizon === 'long' ? 'active' : ''}}" data-horizon="long" bindtap="selectHorizon">长期</view>
   </view>
 
-  <status-banner level="{{freshness.level}}" message="{{freshness.message}}" />
+  <status-banner wx:if="{{freshness.message}}" level="{{freshness.level}}" message="{{freshness.message}}" />
   <status-banner wx:if="{{error}}" level="error" message="{{error}}" />
   <view class="result-count">找到 {{total}} 只</view>
   <view wx:if="{{loading}}" class="loading">正在筛选...</view>

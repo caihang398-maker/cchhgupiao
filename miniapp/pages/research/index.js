@@ -8,7 +8,7 @@ Page({
     error: '',
     items: [],
     total: 0,
-    freshness: {}
+    freshness: { level: '', message: '' }
   },
 
   onShow() {

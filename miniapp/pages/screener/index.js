@@ -36,7 +36,7 @@ Page({
     keyword: '',
     loading: false,
     error: '',
-    freshness: {},
+    freshness: { level: '', message: '' },
     poolCount: 0,
     resultCount: 0,
     items: []

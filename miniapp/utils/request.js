@@ -3,6 +3,9 @@ const { getRequestTransport } = require('../config')
 let redirecting = false
 let redirectingToSubscription = false
 
+const CLOUD_RETRY_DELAYS = [1500, 3000, 5000]
+const CLOUD_TRANSIENT_STATUS = [502, 503, 504]
+
 function redirectToLogin() {
   if (redirecting) return
   redirecting = true
@@ -33,7 +36,10 @@ function handleResponse(response, options, resolve, reject) {
     return
   }
   const error = payload.error || {}
-  const message = error.message || `请求失败（${response.statusCode}）`
+  const transientMessage = CLOUD_TRANSIENT_STATUS.indexOf(response.statusCode) >= 0
+    ? '云服务正在启动，请稍后重试'
+    : ''
+  const message = error.message || transientMessage || `请求失败（${response.statusCode}）`
   if (response.statusCode === 401 && options.auth !== false) {
     redirectToLogin()
   }
@@ -69,6 +75,12 @@ function failureMessage(error, cloudMode) {
   return '无法连接服务器，请检查网络和接口地址'
 }
 
+function canRetry(options, transport) {
+  if (transport.mode !== 'cloud') return false
+  const method = String(options.method || 'GET').toUpperCase()
+  return method === 'GET' || String(options.url || '').indexOf('/auth/') === 0
+}
+
 function request(options) {
   const token = wx.getStorageSync('miniapp_token')
   const headers = Object.assign(
@@ -79,39 +91,58 @@ function request(options) {
     headers.Authorization = `Bearer ${token}`
   }
   const transport = getRequestTransport()
+  const retryEnabled = canRetry(options, transport)
+  const retryDelays = retryEnabled ? CLOUD_RETRY_DELAYS : []
 
   return new Promise((resolve, reject) => {
-    const commonOptions = {
-      method: options.method || 'GET',
-      data: options.data || {},
-      header: headers,
-      timeout: options.timeout || 60000,
-      success(response) {
-        handleResponse(response, options, resolve, reject)
-      },
-      fail(error) {
-        reject(new Error(failureMessage(error, transport.mode === 'cloud')))
+    const send = (attempt) => {
+      const retry = () => {
+        const delay = retryDelays[attempt]
+        if (delay == null) return false
+        setTimeout(() => send(attempt + 1), delay)
+        return true
       }
-    }
+      const commonOptions = {
+        method: options.method || 'GET',
+        data: options.data || {},
+        header: headers,
+        timeout: options.timeout || 60000,
+        success(response) {
+          if (
+            CLOUD_TRANSIENT_STATUS.indexOf(response.statusCode) >= 0 &&
+            retry()
+          ) {
+            return
+          }
+          handleResponse(response, options, resolve, reject)
+        },
+        fail(error) {
+          if (retry()) return
+          reject(new Error(failureMessage(error, transport.mode === 'cloud')))
+        }
+      }
 
-    if (transport.mode === 'cloud') {
-      if (!wx.cloud || typeof wx.cloud.callContainer !== 'function') {
-        reject(new Error('当前微信基础库不支持云托管调用，请升级微信后重试'))
+      if (transport.mode === 'cloud') {
+        if (!wx.cloud || typeof wx.cloud.callContainer !== 'function') {
+          reject(new Error('当前微信基础库不支持云托管调用，请升级微信后重试'))
+          return
+        }
+        wx.cloud.callContainer(Object.assign({}, commonOptions, {
+          config: { env: transport.envId },
+          path: `/api/v1${options.url}`,
+          header: Object.assign({}, headers, {
+            'X-WX-SERVICE': transport.service
+          })
+        }))
         return
       }
-      wx.cloud.callContainer(Object.assign({}, commonOptions, {
-        config: { env: transport.envId },
-        path: `/api/v1${options.url}`,
-        header: Object.assign({}, headers, {
-          'X-WX-SERVICE': transport.service
-        })
+
+      wx.request(Object.assign({}, commonOptions, {
+        url: `${transport.baseUrl}${options.url}`
       }))
-      return
     }
 
-    wx.request(Object.assign({}, commonOptions, {
-      url: `${transport.baseUrl}${options.url}`
-    }))
+    send(0)
   })
 }
 

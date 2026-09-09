@@ -6,7 +6,7 @@ Page({
     loading: true,
     error: '',
     dataDate: '-',
-    freshness: {},
+    freshness: { level: '', message: '' },
     summary: {},
     marketMetrics: [],
     actions: [],
