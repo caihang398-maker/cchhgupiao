@@ -1,0 +1,15 @@
+<view class="login-page">
+  <view class="brand-mark">复</view>
+  <view class="brand-title">个人复盘助手</view>
+  <view class="brand-subtitle">记录计划、实际结果与复盘结论，让每次行动都有迹可循。</view>
+
+  <view wx:if="{{error}}" class="error-notice">{{error}}</view>
+  <view class="privacy-tip" bindtap="toggleAgreement">
+    <view class="agreement-checkbox {{agreed ? 'agreement-checked' : ''}}">{{agreed ? '✓' : ''}}</view>
+    <text>我已阅读并同意</text>
+    <text class="link" catchtap="openAgreement">《用户服务协议》</text>
+    和
+    <text class="link" catchtap="openPrivacy">《隐私保护说明》</text>
+  </view>
+  <button class="primary-button login-button" loading="{{loading}}" bindtap="login">微信快捷登录</button>
+</view>

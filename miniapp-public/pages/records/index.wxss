@@ -1,0 +1,64 @@
+.filters {
+  display: flex;
+  gap: 12rpx;
+}
+
+.filter-button {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  color: #4b5563;
+  background: #ffffff;
+  border: 1rpx solid #d1d5db;
+  border-radius: 8rpx;
+  font-size: 24rpx;
+}
+
+.filter-active {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.record-item {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin-top: 16rpx;
+  padding: 24rpx;
+}
+
+.record-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.record-title {
+  min-width: 0;
+  flex: 1;
+  font-size: 28rpx;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.record-date {
+  color: #6b7280;
+  font-size: 22rpx;
+}
+
+.record-text {
+  margin-top: 12rpx;
+  color: #374151;
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.delete-button {
+  width: 104rpx;
+  margin: 0;
+  color: #b91c1c;
+  background: #ffffff;
+  border: 1rpx solid #fecaca;
+  border-radius: 7rpx;
+  font-size: 22rpx;
+}

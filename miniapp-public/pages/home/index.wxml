@@ -1,0 +1,28 @@
+<view class="page">
+  <view class="page-title">今日复盘</view>
+  <view class="page-subtitle">数据由你主动填写，只统计已经发生的结果，不提供方向判断。</view>
+
+  <view class="metrics section">
+    <view class="metric"><view class="metric-label">全部记录</view><view class="metric-value">{{summary.total || 0}}</view></view>
+    <view class="metric"><view class="metric-label">已完成复盘</view><view class="metric-value">{{summary.completed || 0}}</view></view>
+    <view class="metric"><view class="metric-label">完成率</view><view class="metric-value">{{summary.completionRate || 0}}%</view></view>
+    <view class="metric"><view class="metric-label">近30天</view><view class="metric-value">{{summary.recentCount || 0}}</view></view>
+  </view>
+
+  <button class="primary-button section" bindtap="createRecord">新增一条复盘</button>
+
+  <view class="section">
+    <view class="section-heading">
+      <text class="section-title">最近记录</text>
+      <text class="caption" bindtap="openRecords">查看全部</text>
+    </view>
+    <view wx:if="{{!recent.length}}" class="empty">还没有记录，从一条简短的计划开始。</view>
+    <view wx:for="{{recent}}" wx:key="id" class="record-item" data-id="{{item.id}}" bindtap="openRecord">
+      <view class="record-head"><text class="record-title">{{item.title}}</text><text class="record-date">{{item.date}}</text></view>
+      <view class="record-category">{{item.category}} · {{item.result ? '已复盘' : '待复盘'}}</view>
+      <view class="record-summary">{{item.conclusion || item.plan || '暂无补充内容'}}</view>
+    </view>
+  </view>
+
+  <view class="notice">本工具只整理你输入的记录与历史统计，不替你作出任何决定。</view>
+</view>

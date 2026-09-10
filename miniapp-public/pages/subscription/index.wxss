@@ -1,0 +1,102 @@
+.payment-state {
+  margin-top: 28rpx;
+  padding: 26rpx;
+  color: #92400e;
+  background: #fffbeb;
+  border-left: 6rpx solid #d97706;
+  border-radius: 8rpx;
+}
+
+.state-ready {
+  color: #065f46;
+  background: #ecfdf5;
+  border-left-color: #059669;
+}
+
+.state-message,
+.checklist,
+.features,
+.rule-text {
+  margin-top: 14rpx;
+}
+
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14rpx;
+  padding: 8rpx 0;
+  color: #4b5563;
+  font-size: 23rpx;
+}
+
+.check-state {
+  width: 82rpx;
+  flex: none;
+  color: #b45309;
+  font-weight: 700;
+}
+
+.check-ready {
+  color: #047857;
+}
+
+.plan-item {
+  margin-top: 16rpx;
+  padding: 24rpx;
+  background: #ffffff;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 9rpx;
+}
+
+.plan-name {
+  font-size: 29rpx;
+  font-weight: 700;
+}
+
+.plan-price {
+  color: #b91c1c;
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.plan-item button {
+  margin-top: 20rpx;
+}
+
+.agreement-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 22rpx;
+  color: #4b5563;
+  font-size: 23rpx;
+}
+
+.checkbox {
+  width: 34rpx;
+  height: 34rpx;
+  color: #ffffff;
+  border: 2rpx solid #9ca3af;
+  border-radius: 5rpx;
+  line-height: 30rpx;
+  text-align: center;
+}
+
+.checked {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.link {
+  color: #1d4ed8;
+}
+
+.contact-button {
+  margin-top: 22rpx;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1rpx solid #bfdbfe;
+  border-radius: 8rpx;
+  font-size: 25rpx;
+}

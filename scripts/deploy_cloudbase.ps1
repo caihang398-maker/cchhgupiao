@@ -1,6 +1,8 @@
 param(
     [string]$EnvId = "a125378155-d6gsz6qfn63b5b12b",
     [string]$ServiceName = "gupiaoxiaochengxu",
+    [ValidateSet("research", "personal_records")]
+    [string]$ProductMode = "research",
     [int]$WebPort = 80
 )
 
@@ -75,8 +77,12 @@ try {
     $runtimeEnv["MINIAPP_TRUST_PROXY"] = "true"
     $runtimeEnv["MINIAPP_TRUST_CLOUDBASE_IDENTITY"] = "true"
     $runtimeEnv["MINIAPP_CLOUDBASE_PERSONAL_MODE"] = "true"
+    $runtimeEnv["MINIAPP_PRODUCT_MODE"] = $ProductMode
     $runtimeEnv["MINIAPP_CLOUD_SQLITE_SYNC"] = "true"
     $runtimeEnv["MINIAPP_REQUIRE_PERSISTENT_STORAGE"] = "false"
+    if ($ProductMode -eq "personal_records") {
+        $runtimeEnv["MINIAPP_PAYMENT_LIVE_ENABLED"] = "false"
+    }
 
     $serverConfig = [ordered]@{
         EnvId = $EnvId

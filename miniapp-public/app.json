@@ -1,0 +1,37 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/home/index",
+    "pages/records/index",
+    "pages/record/edit",
+    "pages/insights/index",
+    "pages/profile/index",
+    "pages/subscription/index",
+    "pages/legal/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "个人复盘助手",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f4f6f8",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#6b7280",
+    "selectedColor": "#1d4ed8",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "pages/records/index", "text": "记录" },
+      { "pagePath": "pages/insights/index", "text": "统计" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  },
+  "networkTimeout": {
+    "request": 60000
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
+  "sitemapLocation": "sitemap.json"
+}

@@ -1,0 +1,45 @@
+.avatar {
+  width: 82rpx;
+  height: 82rpx;
+  flex: none;
+  color: #ffffff;
+  background: #1d4ed8;
+  border-radius: 9rpx;
+  font-size: 36rpx;
+  font-weight: 700;
+  line-height: 82rpx;
+  text-align: center;
+}
+
+.profile-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.profile-name,
+.link-title {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.record-count {
+  color: #1d4ed8;
+  font-size: 23rpx;
+  font-weight: 700;
+}
+
+.contact-button {
+  margin-top: 24rpx;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1rpx solid #bfdbfe;
+  border-radius: 8rpx;
+  font-size: 25rpx;
+}
+
+.version {
+  margin-top: 34rpx;
+  color: #9ca3af;
+  font-size: 21rpx;
+  text-align: center;
+}

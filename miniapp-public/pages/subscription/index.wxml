@@ -1,0 +1,33 @@
+<view class="page">
+  <view class="page-title">增值服务</view>
+  <view class="page-subtitle">基础记录功能可直接使用；增值服务开放后，可按需选择固定服务期。</view>
+
+  <view wx:if="{{error}}" class="error-notice">{{error}}</view>
+  <view wx:if="{{loading}}" class="notice">正在读取服务状态...</view>
+
+  <block wx:else>
+    <view class="payment-state {{payment.enabled ? 'state-ready' : ''}}">
+      <view class="section-title">{{payment.enabled ? '可以购买' : '购买暂未开放'}}</view>
+      <view class="caption state-message">{{payment.message}}</view>
+      <view wx:if="{{showTechnical && payment.checklist.length}}" class="checklist">
+        <view wx:for="{{payment.checklist}}" wx:key="key" class="check-row"><text class="check-state {{item.ready ? 'check-ready' : ''}}">{{item.ready ? '已完成' : '待完成'}}</text><text>{{item.label}}</text></view>
+      </view>
+    </view>
+
+    <view wx:if="{{payment.enabled}}" class="section">
+      <view class="section-title">可选服务期</view>
+      <view wx:for="{{plans}}" wx:key="plan_code" class="plan-item">
+        <view class="row"><view><view class="plan-name">{{item.plan_name}}</view><view class="caption">{{item.duration_months}}个月</view></view><view class="plan-price">{{item.priceText}}</view></view>
+        <view class="caption features">{{item.featuresText}}</view>
+        <button class="secondary-button" data-index="{{index}}" loading="{{paying}}" bindtap="choosePlan">购买此服务期</button>
+      </view>
+      <view class="agreement-row" bindtap="toggleAgreement"><view class="checkbox {{agreed ? 'checked' : ''}}">{{agreed ? '✓' : ''}}</view><text>我已阅读并同意</text><text class="link" catchtap="openPaymentRules">《购买与退款说明》</text></view>
+    </view>
+
+    <view class="panel section">
+      <view class="section-title">购买保障</view>
+      <view class="caption rule-text">每笔购买生成唯一订单；服务只在服务器确认付款后生效；重复通知不会重复增加服务期；订单异常可通过客服核对。</view>
+      <button class="contact-button" open-type="contact">联系客服</button>
+    </view>
+  </block>
+</view>

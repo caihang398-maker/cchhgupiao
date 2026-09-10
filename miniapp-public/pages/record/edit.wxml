@@ -1,0 +1,38 @@
+<view class="page">
+  <view class="page-title">{{form.id ? '编辑记录' : '新增记录'}}</view>
+  <view class="page-subtitle">如实记录原计划和实际结果，避免事后改写判断。</view>
+
+  <view class="panel section">
+    <view class="field">
+      <text class="field-label">记录标题</text>
+      <input class="field-input" data-field="title" value="{{form.title}}" maxlength="40" bindinput="handleInput" placeholder="例如：本周学习计划" />
+    </view>
+    <view class="field">
+      <text class="field-label">类别</text>
+      <picker range="{{categories}}" value="{{categoryIndex}}" bindchange="chooseCategory"><view class="picker-value">{{form.category}}</view></picker>
+    </view>
+    <view class="field">
+      <text class="field-label">日期</text>
+      <picker mode="date" value="{{form.date}}" bindchange="chooseDate"><view class="picker-value">{{form.date}}</view></picker>
+    </view>
+    <view class="field">
+      <text class="field-label">原计划</text>
+      <textarea class="field-textarea" data-field="plan" value="{{form.plan}}" maxlength="500" bindinput="handleInput" placeholder="当时计划做什么、依据是什么" />
+    </view>
+    <view class="field">
+      <text class="field-label">实际结果</text>
+      <textarea class="field-textarea" data-field="result" value="{{form.result}}" maxlength="500" bindinput="handleInput" placeholder="完成后再填写实际发生的结果" />
+    </view>
+    <view class="field">
+      <text class="field-label">复盘结论</text>
+      <textarea class="field-textarea" data-field="conclusion" value="{{form.conclusion}}" maxlength="500" bindinput="handleInput" placeholder="保留什么、下次改进什么" />
+    </view>
+    <view class="field score-field">
+      <text class="field-label">本次执行评分</text>
+      <view class="score-row">
+        <button wx:for="{{[1,2,3,4,5]}}" wx:key="*this" class="score-button {{form.score === item ? 'score-active' : ''}}" data-score="{{item}}" bindtap="chooseScore">{{item}}</button>
+      </view>
+    </view>
+    <button class="primary-button" bindtap="submit">保存记录</button>
+  </view>
+</view>

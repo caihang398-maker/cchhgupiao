@@ -1,0 +1,23 @@
+<view class="page">
+  <view class="page-title">我的</view>
+  <view wx:if="{{error}}" class="error-notice">{{error}}</view>
+
+  <view class="panel section profile-row">
+    <view class="avatar">用</view>
+    <view class="profile-main"><view class="profile-name">微信用户</view><view class="caption">{{accountText}}</view></view>
+    <view class="record-count">{{recordCount}}条记录</view>
+  </view>
+
+  <view class="panel section">
+    <view class="row link-row" bindtap="openSubscription"><view><view class="link-title">增值服务</view><view class="caption">查看可选服务期和服务状态</view></view><text class="link-arrow">›</text></view>
+    <view class="row link-row" data-type="agreement" bindtap="openLegal"><view><view class="link-title">用户服务协议</view><view class="caption">服务范围、使用规则和责任边界</view></view><text class="link-arrow">›</text></view>
+    <view class="row link-row" data-type="privacy" bindtap="openLegal"><view><view class="link-title">隐私保护说明</view><view class="caption">本机数据、登录标识和删除方式</view></view><text class="link-arrow">›</text></view>
+    <view class="row link-row" data-type="payment" bindtap="openLegal"><view><view class="link-title">购买与退款说明</view><view class="caption">生效方式、订单核对与退款渠道</view></view><text class="link-arrow">›</text></view>
+    <button class="contact-button" open-type="contact" bindcontact="contact">联系客服</button>
+  </view>
+
+  <button class="danger-button section" bindtap="clearLocalData">清除本机记录</button>
+  <button class="danger-button section" bindtap="deleteAccount">注销账号</button>
+  <button class="secondary-button section" bindtap="logout">退出登录</button>
+  <view class="version">个人复盘助手 2.1.0</view>
+</view>

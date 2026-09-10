@@ -1,0 +1,17 @@
+.category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid #eef0f3;
+  font-size: 26rpx;
+}
+
+.category-row:last-child {
+  border-bottom: none;
+}
+
+.category-value {
+  color: #1d4ed8;
+  font-weight: 700;
+}

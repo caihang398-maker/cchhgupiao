@@ -1,0 +1,65 @@
+.login-page {
+  min-height: 100vh;
+  padding: 170rpx 54rpx 70rpx;
+  background: #ffffff;
+}
+
+.brand-mark {
+  width: 92rpx;
+  height: 92rpx;
+  color: #ffffff;
+  background: #1d4ed8;
+  border-radius: 10rpx;
+  font-size: 46rpx;
+  font-weight: 700;
+  line-height: 92rpx;
+  text-align: center;
+}
+
+.brand-title {
+  margin-top: 34rpx;
+  font-size: 54rpx;
+  font-weight: 700;
+}
+
+.brand-subtitle {
+  margin-top: 20rpx;
+  color: #6b7280;
+  font-size: 27rpx;
+  line-height: 1.7;
+}
+
+.login-button {
+  margin-top: 34rpx;
+}
+
+.privacy-tip {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6rpx;
+  margin-top: 70rpx;
+  color: #6b7280;
+  font-size: 22rpx;
+  line-height: 1.7;
+}
+
+.agreement-checkbox {
+  width: 32rpx;
+  height: 32rpx;
+  margin-top: 3rpx;
+  color: #ffffff;
+  border: 2rpx solid #9ca3af;
+  border-radius: 5rpx;
+  line-height: 28rpx;
+  text-align: center;
+}
+
+.agreement-checked {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.link {
+  color: #1d4ed8;
+}

@@ -120,7 +120,10 @@ def public_user(user: dict[str, Any]) -> dict[str, Any]:
         return str(value)
 
     mobile = str(user.get("mobile") or "")
-    is_wechat_user = mobile.startswith("wx") and len(mobile) == 20
+    identity_type = str(user.get("identity_type") or "").strip().lower()
+    is_wechat_user = identity_type in {"wechat", "cloudbase_personal"} or (
+        mobile.startswith("wx") and len(mobile) == 20
+    )
     return {
         "id": int(user.get("id") or 0),
         "login_name": user.get("login_name"),

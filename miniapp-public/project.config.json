@@ -1,0 +1,23 @@
+{
+  "description": "个人计划记录与历史复盘工具",
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "ignoreUploadUnusedFiles": true,
+    "uploadWithSourceMap": true,
+    "minifyWXSS": true,
+    "minifyWXML": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.7.12",
+  "appid": "wx7ded5b1d303e1b1d",
+  "projectname": "personal-review-assistant",
+  "condition": {}
+}

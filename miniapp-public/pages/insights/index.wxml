@@ -1,0 +1,19 @@
+<view class="page">
+  <view class="page-title">历史统计</view>
+  <view class="page-subtitle">所有指标仅由你的个人记录计算，用于检查执行习惯。</view>
+
+  <view class="metrics section">
+    <view class="metric"><view class="metric-label">记录数</view><view class="metric-value">{{summary.total || 0}}</view></view>
+    <view class="metric"><view class="metric-label">复盘完成率</view><view class="metric-value">{{summary.completionRate || 0}}%</view></view>
+    <view class="metric"><view class="metric-label">平均执行评分</view><view class="metric-value">{{summary.averageScore || '-'}}</view></view>
+    <view class="metric"><view class="metric-label">近30天记录</view><view class="metric-value">{{summary.recentCount || 0}}</view></view>
+  </view>
+
+  <view class="panel section">
+    <view class="section-title">类别分布</view>
+    <view wx:if="{{!categories.length}}" class="empty">记录增加后，这里会显示类别统计。</view>
+    <view wx:for="{{categories}}" wx:key="name" class="category-row"><text>{{item.name}}</text><text class="category-value">{{item.count}}条</text></view>
+  </view>
+
+  <view class="notice">统计只描述已经填写的历史记录，不预测未来结果。</view>
+</view>

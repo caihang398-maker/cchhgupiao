@@ -33,6 +33,7 @@ from .miniapp_auth import (
     wechat_configured,
 )
 from .miniapp_membership import subscription_summary
+from .miniapp_product import miniapp_product_mode, personal_records_mode_enabled
 from .miniapp_service import (
     MiniappServiceError,
     create_alert,
@@ -90,7 +91,7 @@ LOGIN_LIMITER = LoginLimiter()
 
 
 class MiniappApiHandler(BaseHTTPRequestHandler):
-    server_version = "StockQuantMiniappAPI/1.0"
+    server_version = "MiniappAPI/1.0"
 
     def _client_ip(self) -> str:
         trust_proxy = os.getenv("MINIAPP_TRUST_PROXY", "false").strip().lower() in {
@@ -204,8 +205,14 @@ class MiniappApiHandler(BaseHTTPRequestHandler):
                         "status": "ok",
                         "auth_enabled": auth_enabled(),
                         "wechat_configured": wechat_configured(),
+                        "product_mode": miniapp_product_mode(),
                     }
                 )
+                return
+            if personal_records_mode_enabled() and not _personal_records_route_allowed(
+                method, path
+            ):
+                self._error(HTTPStatus.NOT_FOUND, "not_found", "接口不存在")
                 return
             if method == "POST" and path == "/api/v1/auth/login":
                 self._login()
@@ -421,8 +428,18 @@ def validate_startup(host: str) -> None:
     validate_api_startup(host)
 
 
+def _personal_records_route_allowed(method: str, path: str) -> bool:
+    return (method, path) in {
+        ("GET", "/health"),
+        ("GET", "/api/v1/health"),
+        ("POST", "/api/v1/auth/wechat"),
+        ("GET", "/api/v1/me"),
+        ("GET", "/api/v1/subscription"),
+    }
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="A股量化微信小程序 API")
+    parser = argparse.ArgumentParser(description="微信小程序 API")
     parser.add_argument("--host", default=os.getenv("MINIAPP_API_HOST", "127.0.0.1"))
     parser.add_argument(
         "--port",

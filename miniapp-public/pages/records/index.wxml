@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="page-title">我的记录</view>
+  <view class="page-subtitle">按计划、实际结果和结论整理个人经历。</view>
+
+  <view class="filters section">
+    <button wx:for="{{filters}}" wx:key="*this" class="filter-button {{filter === item ? 'filter-active' : ''}}" data-value="{{item}}" bindtap="chooseFilter">{{item}}</button>
+  </view>
+
+  <view wx:if="{{!records.length}}" class="empty">当前分类还没有记录。</view>
+  <view wx:for="{{records}}" wx:key="id" class="record-item">
+    <view class="record-main" data-id="{{item.id}}" bindtap="openRecord">
+      <view class="record-head"><text class="record-title">{{item.title}}</text><text class="record-date">{{item.date}}</text></view>
+      <view class="caption">{{item.category}} · {{item.result ? '已复盘' : '待复盘'}} · 评分 {{item.score || '-'}}</view>
+      <view class="record-text">{{item.conclusion || item.plan || '暂无补充内容'}}</view>
+    </view>
+    <button class="delete-button" data-id="{{item.id}}" catchtap="deleteRecord">删除</button>
+  </view>
+
+  <button class="primary-button section" bindtap="createRecord">新增记录</button>
+</view>

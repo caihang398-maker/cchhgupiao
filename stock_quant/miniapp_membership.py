@@ -9,9 +9,10 @@ from typing import Any
 
 from .auth import auth_enabled, list_subscription_plans
 from .miniapp_auth import public_user, wechat_auto_register_enabled, wechat_trial_days
+from .miniapp_product import personal_records_mode_enabled
 
 
-DEFAULT_PLANS = [
+RESEARCH_DEFAULT_PLANS = [
     {
         "id": 0,
         "plan_code": "month",
@@ -51,6 +52,46 @@ DEFAULT_PLANS = [
 ]
 
 
+PERSONAL_RECORDS_DEFAULT_PLANS = [
+    {
+        "id": 0,
+        "plan_code": "month",
+        "plan_name": "1个月增值服务",
+        "duration_months": 1,
+        "price": 10.0,
+        "currency": "CNY",
+        "features": ["云端备份", "多设备同步", "历史记录导出", "长期统计"],
+    },
+    {
+        "id": 0,
+        "plan_code": "quarter",
+        "plan_name": "3个月增值服务",
+        "duration_months": 3,
+        "price": 28.0,
+        "currency": "CNY",
+        "features": ["云端备份", "多设备同步", "历史记录导出", "长期统计"],
+    },
+    {
+        "id": 0,
+        "plan_code": "half_year",
+        "plan_name": "6个月增值服务",
+        "duration_months": 6,
+        "price": 52.0,
+        "currency": "CNY",
+        "features": ["云端备份", "多设备同步", "历史记录导出", "长期统计"],
+    },
+    {
+        "id": 0,
+        "plan_code": "year",
+        "plan_name": "12个月增值服务",
+        "duration_months": 12,
+        "price": 98.0,
+        "currency": "CNY",
+        "features": ["云端备份", "多设备同步", "历史记录导出", "长期统计"],
+    },
+]
+
+
 def _truthy(name: str, default: str = "false") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
@@ -84,6 +125,9 @@ def _plan(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _plans() -> list[dict[str, Any]]:
+    if personal_records_mode_enabled():
+        return [dict(item) for item in PERSONAL_RECORDS_DEFAULT_PLANS]
+
     configured: list[dict[str, Any]] = []
     if auth_enabled():
         configured = [
@@ -92,7 +136,9 @@ def _plans() -> list[dict[str, Any]]:
             if str(row.get("plan_code") or "") != "trial_7d"
         ]
     by_code = {plan["plan_code"]: plan for plan in configured}
-    plans = [by_code.get(default["plan_code"], dict(default)) for default in DEFAULT_PLANS]
+    plans = [
+        by_code.get(default["plan_code"], dict(default)) for default in RESEARCH_DEFAULT_PLANS
+    ]
     extra = [plan for plan in configured if plan["plan_code"] not in {item["plan_code"] for item in plans}]
     return plans + extra
 
