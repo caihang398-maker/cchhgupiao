@@ -53,6 +53,10 @@ powershell -ExecutionPolicy Bypass -File scripts\start_miniapp_local.ps1
 powershell -ExecutionPolicy Bypass -File scripts\deploy_cloudbase.ps1
 ```
 
+PC 端与云托管是两个运行环境。配置 `data/miniapp_sync.json` 后，PC 每次成功刷新推荐或行情都会
+把不含账号、持仓、预警和交易记录的快照上传到云端；小程序打开、下拉或点击“刷新数据”时会自动
+检查并载入。也可在 PC 首页点击“同步到小程序”手动重试。
+
 ## 从 GitHub 安装
 
 ```powershell

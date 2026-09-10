@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from .auth import auth_enabled
 from .cloud_state import cloud_sqlite_sync_enabled, prepare_cloud_state, sync_cloud_state
 from .logging_config import configure_application_logging
+from .miniapp_feed import cloud_feed_status, refresh_market_feed
 from .miniapp_auth import (
     MiniappAuthError,
     MiniappConfigurationError,
@@ -206,6 +207,7 @@ class MiniappApiHandler(BaseHTTPRequestHandler):
                         "auth_enabled": auth_enabled(),
                         "wechat_configured": wechat_configured(),
                         "product_mode": miniapp_product_mode(),
+                        "market_feed": cloud_feed_status(),
                     }
                 )
                 return
@@ -235,6 +237,9 @@ class MiniappApiHandler(BaseHTTPRequestHandler):
                 return
 
             require_active_service(user)
+
+            if method == "GET":
+                refresh_market_feed()
 
             if method == "GET" and path == "/api/v1/home":
                 self._ok(get_home(user, self._int_query(query, "limit", 12, 1, 50)))
@@ -449,6 +454,7 @@ def main() -> int:
     args = parser.parse_args()
     configure_application_logging()
     prepare_cloud_state()
+    refresh_market_feed(force=True)
     validate_startup(args.host)
     server = MiniappApiServer((args.host, args.port), MiniappApiHandler)
     LOGGER.info("小程序 API 已启动：http://%s:%s", args.host, args.port)

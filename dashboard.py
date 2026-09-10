@@ -39,6 +39,7 @@ from stock_quant.health import assess_market_data_status, assess_recommendation_
 from stock_quant.indicators import add_indicators
 from stock_quant.leaders import LeaderBundle, fetch_leader_bundle, leader_switches
 from stock_quant.logging_config import configure_application_logging
+from stock_quant.miniapp_feed import publish_market_feed_if_configured
 from stock_quant.notify import send_webhook
 from stock_quant.presentation import (
     PLOTLY_CONFIG,
@@ -3612,13 +3613,25 @@ dashboard_notice = st.session_state.pop("dashboard_notice", "")
 if dashboard_notice:
     st.success(dashboard_notice)
 
-market_refresh_col, refresh_col, hint_col = st.columns([0.16, 0.22, 0.62])
+market_refresh_col, refresh_col, sync_col, hint_col = st.columns([0.14, 0.2, 0.18, 0.48])
 with market_refresh_col:
     market_refresh_clicked = st.button("只更新行情", width="stretch")
 with refresh_col:
     refresh_clicked = st.button("刷新并生成今日推荐", type="primary", width="stretch")
+with sync_col:
+    sync_miniapp_clicked = st.button("同步到小程序", width="stretch")
 with hint_col:
-    st.write("“只更新行情”用于盘中快速确认市场；生成推荐会执行完整资金、基本面和K线扫描。")
+    st.write("生成成功后会自动同步；小程序下拉或点击刷新即可读取。")
+
+if sync_miniapp_clicked:
+    with st.spinner("正在同步最新行情与推荐到小程序"):
+        sync_result = publish_market_feed_if_configured()
+    if sync_result is None:
+        st.warning("尚未配置小程序云端同步，请检查 data/miniapp_sync.json。")
+    elif sync_result[0]:
+        st.success(sync_result[1])
+    else:
+        st.error(sync_result[1])
 
 if market_refresh_clicked:
     st.cache_data.clear()
@@ -3635,7 +3648,11 @@ if market_refresh_clicked:
                 global_summary=global_summary,
                 global_indices=global_indices,
             )
-        st.session_state["dashboard_notice"] = "市场行情已更新，推荐列表未重新计算。"
+            sync_result = publish_market_feed_if_configured()
+        notice = "市场行情已更新，推荐列表未重新计算。"
+        if sync_result is not None:
+            notice += " " + sync_result[1]
+        st.session_state["dashboard_notice"] = notice
         st.rerun()
     except Exception as exc:
         LOGGER.exception("更新全市场行情失败")
@@ -3665,6 +3682,13 @@ if refresh_clicked:
             if isinstance(context.spot, pd.DataFrame) and not context.spot.empty:
                 st.session_state["latest_spot_dashboard"] = context.spot
         st.success(f"今日推荐已刷新并保存，共 {len(recommendations)} 只。")
+        with st.spinner("正在把最新结果同步到小程序"):
+            sync_result = publish_market_feed_if_configured()
+        if sync_result is not None:
+            if sync_result[0]:
+                st.success(sync_result[1])
+            else:
+                st.warning(sync_result[1] + "；PC 数据已保存，可稍后点击“同步到小程序”重试。")
         near_match_notes = [item for item in errors if str(item).startswith("严格组合筛选无结果")]
         if near_match_notes:
             st.warning(near_match_notes[-1])

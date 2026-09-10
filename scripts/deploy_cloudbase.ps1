@@ -3,6 +3,7 @@ param(
     [string]$ServiceName = "gupiaoxiaochengxu",
     [ValidateSet("research", "personal_records")]
     [string]$ProductMode = "research",
+    [string]$FeedUrl = "https://a125378155-d6gsz6qfn63b5b12b-1483000192.tcloudbaseapp.com/miniapp-feed/stock_recommendations.seed.gz",
     [int]$WebPort = 80
 )
 
@@ -92,6 +93,8 @@ try {
     $runtimeEnv["MINIAPP_CLOUDBASE_PERSONAL_MODE"] = "true"
     $runtimeEnv["MINIAPP_PRODUCT_MODE"] = $ProductMode
     $runtimeEnv["MINIAPP_CLOUD_SQLITE_SYNC"] = "true"
+    $runtimeEnv["MINIAPP_CLOUD_FEED_URL"] = $FeedUrl
+    $runtimeEnv["MINIAPP_CLOUD_FEED_REFRESH_SECONDS"] = "30"
     $runtimeEnv["MINIAPP_REQUIRE_PERSISTENT_STORAGE"] = "false"
     if ($ProductMode -eq "personal_records") {
         $runtimeEnv["MINIAPP_PAYMENT_LIVE_ENABLED"] = "false"

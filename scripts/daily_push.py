@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from stock_quant.notify import send_webhook
+from stock_quant.miniapp_feed import publish_market_feed_if_configured
 from stock_quant.recommender import HORIZON_LABELS, scan_recommendations
 from stock_quant.review import refresh_recommendation_outcomes
 from stock_quant.settings import STRATEGY_VERSION
@@ -94,6 +95,9 @@ def main() -> int:
         save_capital_hotspots(run_id, _context.capital_hotspots)
         save_market_snapshot(run_id, _context.breadth, _context.global_summary, _context.global_indices)
         update_run(run_id, "done", f"生成 {len(frame)} 条推荐；数据源提示 {len(errors)} 条")
+        miniapp_sync = publish_market_feed_if_configured()
+        if miniapp_sync is not None:
+            print(f"小程序同步：{miniapp_sync[1]}")
         _reviewed, review_errors = refresh_recommendation_outcomes(
             ignore_proxy=args.ignore_proxy,
         )

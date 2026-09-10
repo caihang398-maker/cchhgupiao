@@ -4,6 +4,7 @@ const { compactNumber, dateText } = require('../../utils/format')
 Page({
   data: {
     loading: true,
+    refreshing: false,
     error: '',
     dataDate: '-',
     freshness: { level: '', message: '' },
@@ -26,6 +27,16 @@ Page({
 
   onPullDownRefresh() {
     this.loadHome().finally(() => wx.stopPullDownRefresh())
+  },
+
+  manualRefresh() {
+    if (this.data.refreshing) return
+    this.setData({ refreshing: true })
+    this.loadHome()
+      .then((ok) => {
+        if (ok) wx.showToast({ title: '已读取最新数据', icon: 'success' })
+      })
+      .finally(() => this.setData({ refreshing: false }))
   },
 
   loadHome() {
@@ -53,8 +64,12 @@ Page({
           loading: false
         })
         this.applyFilter(this.data.selectedHorizon)
+        return true
       })
-      .catch((error) => this.setData({ loading: false, error: error.message }))
+      .catch((error) => {
+        this.setData({ loading: false, error: error.message })
+        return false
+      })
   },
 
   selectHorizon(event) {
