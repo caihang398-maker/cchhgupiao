@@ -20,8 +20,21 @@ function Assert-LastExitCode([string]$Message) {
 }
 
 function Invoke-TcbJson([string[]]$Arguments) {
-    $raw = (& npx.cmd --yes --package "@cloudbase/cli" tcb @Arguments 2>&1) -join "`n"
-    Assert-LastExitCode "CloudBase CLI command failed"
+    $nodePath = (Get-Command node.exe -ErrorAction Stop).Source
+    $bridgePath = Join-Path $PSScriptRoot "tcb_cli_bridge.js"
+    if (-not (Test-Path -LiteralPath $bridgePath)) {
+        throw "Unable to locate the CloudBase CLI bridge: $bridgePath"
+    }
+    try {
+        $env:TCB_CLI_ARGUMENTS = ConvertTo-Json @($Arguments) -Compress
+        $raw = (& $nodePath $bridgePath 2>&1) -join "`n"
+    }
+    finally {
+        Remove-Item Env:TCB_CLI_ARGUMENTS -ErrorAction SilentlyContinue
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "CloudBase CLI command failed (exit code $LASTEXITCODE):`n$raw"
+    }
     $jsonStart = $raw.IndexOf("{")
     if ($jsonStart -lt 0) {
         throw "CloudBase CLI did not return JSON: $raw"
