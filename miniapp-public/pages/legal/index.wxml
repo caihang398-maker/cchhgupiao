@@ -1,6 +1,6 @@
 <view class="page">
   <view class="page-title">{{title}}</view>
-  <view class="page-subtitle">更新日期：2026年09月09日</view>
+  <view class="page-subtitle">更新日期：2026年09月11日</view>
   <view wx:for="{{sections}}" wx:key="title" class="legal-section">
     <view class="section-title">{{item.title}}</view>
     <view class="legal-text">{{item.text}}</view>

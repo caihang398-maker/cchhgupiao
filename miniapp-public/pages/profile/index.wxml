@@ -19,5 +19,5 @@
   <button class="danger-button section" bindtap="clearLocalData">清除本机记录</button>
   <button class="danger-button section" bindtap="deleteAccount">注销账号</button>
   <button class="secondary-button section" bindtap="logout">退出登录</button>
-  <view class="version">个人复盘助手 2.1.0</view>
+  <view class="version">个人复盘助手 2.2.0</view>
 </view>
