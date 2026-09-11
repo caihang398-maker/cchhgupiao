@@ -92,8 +92,8 @@ try {
     $runtimeEnv["MINIAPP_TRUST_CLOUDBASE_IDENTITY"] = "true"
     $runtimeEnv["MINIAPP_CLOUDBASE_PERSONAL_MODE"] = "true"
     $runtimeEnv["MINIAPP_PRODUCT_MODE"] = $ProductMode
-    $runtimeEnv["MINIAPP_CLOUD_SQLITE_SYNC"] = "true"
-    $runtimeEnv["MINIAPP_CLOUD_FEED_URL"] = $FeedUrl
+    $runtimeEnv["MINIAPP_CLOUD_SQLITE_SYNC"] = if ($ProductMode -eq "personal_records") { "false" } else { "true" }
+    $runtimeEnv["MINIAPP_CLOUD_FEED_URL"] = if ($ProductMode -eq "personal_records") { "" } else { $FeedUrl }
     $runtimeEnv["MINIAPP_CLOUD_FEED_REFRESH_SECONDS"] = "30"
     $runtimeEnv["MINIAPP_REQUIRE_PERSISTENT_STORAGE"] = "false"
     if ($ProductMode -eq "personal_records") {

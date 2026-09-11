@@ -33,3 +33,4 @@ logs/
 *.bak
 .streamlit/secrets.toml
 miniapp/project.private.config.json
+miniapp-public/project.private.config.json

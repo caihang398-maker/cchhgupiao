@@ -27,7 +27,7 @@ Page({
           method: 'POST',
           auth: false,
           data: { code: code || '' },
-          timeout: 90000
+          timeout: 30000
         })
           .then((session) => {
             if (session.status !== 'authenticated' || !session.token) {

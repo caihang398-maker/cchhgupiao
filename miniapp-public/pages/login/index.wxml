@@ -11,5 +11,5 @@
     和
     <text class="link" catchtap="openPrivacy">《隐私保护说明》</text>
   </view>
-  <button class="primary-button login-button" loading="{{loading}}" bindtap="login">微信快捷登录</button>
+  <button class="primary-button login-button" loading="{{loading}}" bindtap="login">{{loading ? '正在连接服务...' : '微信快捷登录'}}</button>
 </view>

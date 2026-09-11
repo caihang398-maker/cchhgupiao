@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from scripts.check_public_miniapp_compliance import collect_violations
-from stock_quant.miniapp_api import _personal_records_route_allowed
+from stock_quant.miniapp_api import _personal_records_route_allowed, prepare_runtime_state
 from stock_quant.miniapp_auth import public_user
 from stock_quant.miniapp_membership import subscription_summary
 
@@ -63,6 +63,26 @@ class PublicMiniappComplianceTests(unittest.TestCase):
         )
         self.assertIn("云端备份", features)
         self.assertNotIn("买卖", features)
+
+    def test_personal_records_mode_skips_research_state_startup(self) -> None:
+        with (
+            patch.dict(os.environ, {"MINIAPP_PRODUCT_MODE": "personal_records"}, clear=False),
+            patch("stock_quant.miniapp_api.prepare_cloud_state") as prepare_state,
+            patch("stock_quant.miniapp_api.refresh_market_feed") as refresh_feed,
+        ):
+            prepare_runtime_state()
+        prepare_state.assert_not_called()
+        refresh_feed.assert_not_called()
+
+    def test_research_mode_still_prepares_market_state(self) -> None:
+        with (
+            patch.dict(os.environ, {"MINIAPP_PRODUCT_MODE": "research"}, clear=False),
+            patch("stock_quant.miniapp_api.prepare_cloud_state") as prepare_state,
+            patch("stock_quant.miniapp_api.refresh_market_feed") as refresh_feed,
+        ):
+            prepare_runtime_state()
+        prepare_state.assert_called_once_with()
+        refresh_feed.assert_called_once_with(force=True)
 
 
 if __name__ == "__main__":

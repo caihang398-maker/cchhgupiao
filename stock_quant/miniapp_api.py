@@ -443,6 +443,16 @@ def _personal_records_route_allowed(method: str, path: str) -> bool:
     }
 
 
+def prepare_runtime_state() -> None:
+    """Prepare only the state required by the selected miniapp product."""
+
+    if personal_records_mode_enabled():
+        LOGGER.info("公开记录模式已跳过行情快照初始化")
+        return
+    prepare_cloud_state()
+    refresh_market_feed(force=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="微信小程序 API")
     parser.add_argument("--host", default=os.getenv("MINIAPP_API_HOST", "127.0.0.1"))
@@ -453,8 +463,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     configure_application_logging()
-    prepare_cloud_state()
-    refresh_market_feed(force=True)
+    prepare_runtime_state()
     validate_startup(args.host)
     server = MiniappApiServer((args.host, args.port), MiniappApiHandler)
     LOGGER.info("小程序 API 已启动：http://%s:%s", args.host, args.port)

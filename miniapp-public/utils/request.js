@@ -1,6 +1,7 @@
 const { getRequestTransport } = require('../config')
 
-const TRANSIENT_STATUS = [502, 503, 504]
+const TRANSIENT_STATUS = [500, 502, 503, 504]
+const TRANSIENT_MESSAGE = '服务正在启动或暂时繁忙，请稍后重试'
 
 function parsePayload(data) {
   if (typeof data !== 'string') return data || {}
@@ -18,7 +19,7 @@ function request(options) {
   if (options.auth !== false && token) headers.Authorization = `Bearer ${token}`
   const method = String(options.method || 'GET').toUpperCase()
   const retryDelays = method === 'GET' || String(options.url).indexOf('/auth/') === 0
-    ? [1200, 2500, 4500]
+    ? [1200, 2500]
     : []
 
   return new Promise((resolve, reject) => {
@@ -32,6 +33,10 @@ function request(options) {
           const payload = parsePayload(response.data)
           if (TRANSIENT_STATUS.indexOf(response.statusCode) >= 0 && retryDelays[attempt] != null) {
             setTimeout(() => send(attempt + 1), retryDelays[attempt])
+            return
+          }
+          if (TRANSIENT_STATUS.indexOf(response.statusCode) >= 0) {
+            reject(new Error(TRANSIENT_MESSAGE))
             return
           }
           if (response.statusCode >= 200 && response.statusCode < 300 && payload.ok) {
