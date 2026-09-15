@@ -7,10 +7,6 @@ Page({
   },
 
   onShow() {
-    if (!wx.getStorageSync('miniapp_token')) {
-      wx.reLaunch({ url: '/pages/login/index' })
-      return
-    }
     this.refresh()
   },
 

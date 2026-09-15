@@ -45,10 +45,12 @@ function request(options) {
           }
           if (response.statusCode === 401 && options.auth !== false) {
             getApp().clearSession()
-            wx.reLaunch({ url: '/pages/login/index' })
           }
           const detail = payload.error || {}
-          const error = new Error(detail.message || `请求失败（${response.statusCode}）`)
+          const fallbackMessage = response.statusCode === 401
+            ? '登录状态已失效，可在“我的”页面重新登录'
+            : `请求失败（${response.statusCode}）`
+          const error = new Error(detail.message || fallbackMessage)
           error.code = detail.code || 'request_failed'
           reject(error)
         },

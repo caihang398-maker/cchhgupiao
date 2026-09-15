@@ -3,10 +3,13 @@
   <view wx:if="{{error}}" class="error-notice">{{error}}</view>
 
   <view class="panel section profile-row">
-    <view class="avatar">用</view>
-    <view class="profile-main"><view class="profile-name">微信用户</view><view class="caption">{{accountText}}</view></view>
+    <view class="avatar">{{loggedIn ? '用' : '访'}}</view>
+    <view class="profile-main"><view class="profile-name">{{profileName}}</view><view class="caption">{{accountText}}</view></view>
     <view class="record-count">{{recordCount}}条记录</view>
   </view>
+
+  <view wx:if="{{!loggedIn}}" class="notice">你可以先浏览、新增记录并查看统计。微信登录是自愿选项，不影响本机功能使用。</view>
+  <button wx:if="{{!loggedIn}}" class="secondary-button section" bindtap="openLogin">微信账号登录（可选）</button>
 
   <view class="panel section">
     <view class="row link-row" bindtap="openSubscription"><view><view class="link-title">增值服务</view><view class="caption">查看可选服务期和服务状态</view></view><text class="link-arrow">›</text></view>
@@ -17,7 +20,7 @@
   </view>
 
   <button class="danger-button section" bindtap="clearLocalData">清除本机记录</button>
-  <button class="danger-button section" bindtap="deleteAccount">注销账号</button>
-  <button class="secondary-button section" bindtap="logout">退出登录</button>
-  <view class="version">个人复盘助手 2.2.0</view>
+  <button wx:if="{{loggedIn}}" class="danger-button section" bindtap="deleteAccount">注销账号</button>
+  <button wx:if="{{loggedIn}}" class="secondary-button section" bindtap="logout">退出登录</button>
+  <view class="version">个人复盘助手 2.2.1</view>
 </view>

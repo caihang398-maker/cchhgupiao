@@ -52,5 +52,11 @@ Page({
 
   toggleAgreement() {
     this.setData({ agreed: !this.data.agreed })
+  },
+
+  continueAsGuest() {
+    wx.navigateBack({
+      fail: () => wx.switchTab({ url: '/pages/home/index' })
+    })
   }
 })

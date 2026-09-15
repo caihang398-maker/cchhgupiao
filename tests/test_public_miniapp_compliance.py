@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from scripts.check_public_miniapp_compliance import collect_violations
@@ -13,6 +15,20 @@ from stock_quant.miniapp_membership import subscription_summary
 class PublicMiniappComplianceTests(unittest.TestCase):
     def test_public_source_has_no_research_or_dealing_features(self) -> None:
         self.assertEqual(collect_violations(), [])
+
+    def test_public_miniapp_starts_in_guest_accessible_home(self) -> None:
+        root = Path(__file__).resolve().parents[1] / "miniapp-public"
+        app_json = json.loads((root / "app.json").read_text(encoding="utf-8"))
+        self.assertEqual(app_json["pages"][0], "pages/home/index")
+        for relative in (
+            "pages/home/index.js",
+            "pages/records/index.js",
+            "pages/insights/index.js",
+            "pages/profile/index.js",
+            "utils/request.js",
+        ):
+            source = (root / relative).read_text(encoding="utf-8")
+            self.assertNotIn("reLaunch({ url: '/pages/login/index'", source)
 
     def test_personal_records_service_exposes_only_public_routes(self) -> None:
         self.assertTrue(_personal_records_route_allowed("POST", "/api/v1/auth/wechat"))

@@ -33,6 +33,10 @@
   margin-top: 34rpx;
 }
 
+.guest-button {
+  margin-top: 20rpx;
+}
+
 .privacy-tip {
   display: flex;
   align-items: flex-start;

@@ -40,6 +40,12 @@ FORBIDDEN_API_PATHS = {
     "/screener",
     "/stocks",
 }
+FORBIDDEN_AUTH_CAPABILITIES = {
+    "getPhoneNumber": "手机号授权",
+    "chooseAvatar": "头像授权",
+    'open-type="getUserInfo"': "用户资料授权",
+    "wx.getUserProfile": "用户资料授权",
+}
 EXPECTED_TITLE = "个人复盘助手"
 
 
@@ -59,6 +65,9 @@ def collect_violations(root: Path = PUBLIC_APP_ROOT) -> list[str]:
         for api_path in sorted(FORBIDDEN_API_PATHS):
             if api_path in text:
                 violations.append(f"{relative}: 引用了公开版禁用接口“{api_path}”")
+        for capability, label in FORBIDDEN_AUTH_CAPABILITIES.items():
+            if capability in text:
+                violations.append(f"{relative}: 不得强制或申请{label}“{capability}”")
 
     app_json_path = root / "app.json"
     try:
@@ -69,6 +78,24 @@ def collect_violations(root: Path = PUBLIC_APP_ROOT) -> list[str]:
         title = str(app_json.get("window", {}).get("navigationBarTitleText") or "")
         if title != EXPECTED_TITLE:
             violations.append(f"app.json 标题应为“{EXPECTED_TITLE}”，当前为“{title}”")
+        pages = app_json.get("pages") or []
+        if not pages or pages[0] != "pages/home/index":
+            violations.append("公开版必须直接进入可体验的首页，不得以登录页作为启动页")
+
+    for relative in (
+        Path("pages/home/index.js"),
+        Path("pages/records/index.js"),
+        Path("pages/insights/index.js"),
+        Path("pages/profile/index.js"),
+        Path("utils/request.js"),
+    ):
+        text = (root / relative).read_text(encoding="utf-8")
+        if "reLaunch({ url: '/pages/login/index'" in text:
+            violations.append(f"{relative}: 不得自动跳转到登录页")
+
+    login_wxml = (root / "pages/login/index.wxml").read_text(encoding="utf-8")
+    if "暂不登录，继续体验" not in login_wxml:
+        violations.append("可选登录页必须提供清晰的继续体验入口")
 
     cloud_config = (root / "cloud.config.js").read_text(encoding="utf-8")
     if cloud_config.count("service: 'fupanbiji'") != 3:

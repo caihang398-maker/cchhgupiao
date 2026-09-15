@@ -3,26 +3,59 @@ const { listRecords, clearRecords } = require('../../utils/records')
 
 Page({
   data: {
-    accountText: '微信快捷登录',
+    accountText: '无需登录，本机功能可正常使用',
+    profileName: '访客模式',
+    loggedIn: false,
     recordCount: 0,
     error: ''
   },
 
   onShow() {
-    if (!wx.getStorageSync('miniapp_token')) {
-      wx.reLaunch({ url: '/pages/login/index' })
+    const loggedIn = Boolean(wx.getStorageSync('miniapp_token'))
+    this.setData({
+      accountText: loggedIn ? '正在核对账号状态' : '无需登录，本机功能可正常使用',
+      profileName: loggedIn ? '微信用户' : '访客模式',
+      loggedIn,
+      recordCount: listRecords().length,
+      error: ''
+    })
+    if (!loggedIn) {
       return
     }
-    this.setData({ recordCount: listRecords().length, error: '' })
     request({ url: '/me' })
       .then((data) => {
         const user = data.user || {}
-        this.setData({ accountText: user.is_wechat_user ? '微信快捷登录' : (user.real_name || '微信用户') })
+        this.setData({
+          accountText: user.is_wechat_user ? '已登录微信账号' : '已登录',
+          profileName: user.real_name || '微信用户',
+          loggedIn: true
+        })
       })
-      .catch((error) => this.setData({ error: error.message }))
+      .catch((error) => this.setData({
+        accountText: '无需登录，本机功能可正常使用',
+        profileName: '访客模式',
+        loggedIn: false,
+        error: error.message
+      }))
+  },
+
+  openLogin() {
+    wx.navigateTo({ url: '/pages/login/index' })
   },
 
   openSubscription() {
+    if (!this.data.loggedIn) {
+      wx.showModal({
+        title: '登录为自愿选择',
+        content: '本机复盘功能无需登录。增值服务需要识别微信账号，是否前往可选登录页面？',
+        confirmText: '前往登录',
+        cancelText: '继续体验',
+        success: (result) => {
+          if (result.confirm) this.openLogin()
+        }
+      })
+      return
+    }
     wx.navigateTo({ url: '/pages/subscription/index' })
   },
 
@@ -55,13 +88,26 @@ Page({
         if (!result.confirm) return
         clearRecords()
         getApp().clearSession()
-        wx.reLaunch({ url: '/pages/login/index' })
+        this.setData({
+          accountText: '无需登录，本机功能可正常使用',
+          profileName: '访客模式',
+          loggedIn: false,
+          recordCount: 0,
+          error: ''
+        })
+        wx.showToast({ title: '已注销', icon: 'success' })
       }
     })
   },
 
   logout() {
     getApp().clearSession()
-    wx.reLaunch({ url: '/pages/login/index' })
+    this.setData({
+      accountText: '无需登录，本机功能可正常使用',
+      profileName: '访客模式',
+      loggedIn: false,
+      error: ''
+    })
+    wx.showToast({ title: '已退出登录', icon: 'success' })
   }
 })
